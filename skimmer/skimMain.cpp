@@ -16,6 +16,8 @@ void show_usage(std::string name){
 	    << "Options:\n"
 	    <<"\t-h,--help\tShow this message\n"
 	    << "\t-s\t--synch\tInitialise and use a synch cut flow.\n"
+	    << "\t-c\tCONF\tDataset config file\n"
+	    << "\t-m\tCUTSTAGE\tMake a skimmed tree at a defined point in the cuts.\n\t\t\t0 - Post lepton selection 1 - Post jet selection. 2 - Final event selecction I guess\n"
 	    << std::endl;
 }
 
@@ -23,12 +25,17 @@ int main(int argc, char* argv[]){
 
   //Parse command line arguments here!
   int opt;
-
+  int cutStage = -1;
+  std::vector<std::string> cutStageNameVec = {"lepSel","jetSel","fullSel"};
   char * configFile = NULL;
+
+  //The integrated luminosity of the data being used. 
+  //At some point this should become a sum of lumis of the data being used, but for now it is hard-coded because I'm not looking at data yet. Or something.
+  float integratedLuminosity = 2500;
 
   bool makeCutFlow = false;
 
-  while ((opt = getopt(argc,argv,"hsc:"))!=-1){
+  while ((opt = getopt(argc,argv,"hsc:m:"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -40,12 +47,23 @@ int main(int argc, char* argv[]){
     case 'c':
       configFile = optarg;
       break;
+    case 'm':
+      cutStage = atoi(optarg);
+      break;
+    case '?':
+      if (optopt == 'c')
+	fprintf(stderr, "Option -%c requires an argument. \n", optopt);
+      return 0;
     default:
       std::cerr << "Who knows" << std::endl;
       break;
     }
   }
 
+  if (!(cutStage == 0 || cutStage == -1 || cutStage == 1 || cutStage == 2)){
+    std::cout << "Must be between -1 and 2! Exiting!" << std::endl;
+    return 0;
+  }
   std::cout << "using config file: " << configFile <<std::endl;
 
   //Firstly we will need to read in some config stuff about the dataset I guess.
@@ -67,22 +85,41 @@ int main(int argc, char* argv[]){
   //TH1F* cutFlow = NULL;
   if (makeCutFlow){
     for (auto const & dataset : *datasets){
-      cutFlow[dataset.getName()] = new TH1F(("cutFlowTable"+dataset.getName()).c_str(),("cutFlowTable"+dataset.getName()).c_str(),9,0,9);
+      cutFlow[dataset.getName()] = new TH1F(("cutFlowTable"+dataset.getName()).c_str(),("cutFlowTable"+dataset.getName()).c_str(),10,0,10);
     }
   }
 
   //Loop over the datasets
   //TODO change this to not just loop over one file!
   for (auto const & dataset : *datasets){
-    if (makeCutFlow) cutObj->setCutFlowHistogram(cutFlow[dataset.getName()]);
+
     std::cout << "Processing dataset " << dataset.getName();
+    //Do some initialisations of stuff on a per-database basis here.
+    //First update the cut flow table if we're doing that.
+    if (makeCutFlow) cutObj->setCutFlowHistogram(cutFlow[dataset.getName()]);
+    
+    //Next update the datasetweight in cut obj (this is important for filling histograms and the like).
+    if (dataset.isMC()){
+      std::cout << " which contains " << dataset.getTotalEvents() << " events and a cross section of " << dataset.getCrossSection() << " giving a dataset weight of " << integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents() << std::endl;
+      cutObj->setDatasetWeight(integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents());
+    }
+    else cutObj->setDatasetWeight(1.);
+    
+
     //The name should maybe be customisable?
     TChain * datasetChain = new TChain("TNT/BOOM");
     
     //there will be a loop here to add all of the files to the chain. Now we're just doing one to test this whole thing works.
-    datasetChain->Add((dataset.getFolderName()+"*.root").c_str());
+    datasetChain->Add((dataset.getFolderName()+"OutTree_1.root").c_str());
     //    datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
     
+    //If we're making a skim (which is, nominally, the point of this script, though it's probably just gonna become my eventual analysis script) then make the skimming file here.
+    TTree * cloneTree;
+    if (cutStage > -1){
+      cloneTree = datasetChain->CloneTree(0);
+      cutObj->setSkimTree(cutStage,cloneTree);
+    }
+
     tWEvent * event = new tWEvent(datasetChain);
 
     int numberOfEntries = datasetChain->GetEntries();
@@ -100,13 +137,21 @@ int main(int argc, char* argv[]){
     } //Close loop over all events
     std::cout << std::endl; //Add in a line break after the status bar thing.
 
+    //Save the clone trees here
+    if (cutStage > -1){
+      TFile cloneFile(("skims/"+dataset.getName()+cutStageNameVec[cutStage]+".root").c_str(),"RECREATE");
+      cloneFile.cd();
+      cloneTree->Write();
+      cloneFile.Write();
+      cloneFile.Close();
+    }
+
     if (makeCutFlow){
-      for (auto const & dSet: *datasets){
-	std::cout << "Cut flow for " << dataset.getName() << std::endl;
-	for (int cfInd = 1; cfInd < cutFlow[dSet.getName()]->GetXaxis()->GetNbins()+1; cfInd++){
-	  std::cout << cfInd << " : " << cutFlow[dSet.getName()]->GetBinContent(cfInd) << std::endl;
-	}
+      std::cout << "Cut flow for " << dataset.getName() << std::endl;
+      for (int cfInd = 1; cfInd < cutFlow[dataset.getName()]->GetXaxis()->GetNbins()+1; cfInd++){
+	std::cout << cfInd << " : " << cutFlow[dataset.getName()]->GetBinContent(cfInd) << std::endl;
       }
+      
     }
 
   } // Close dataset loop

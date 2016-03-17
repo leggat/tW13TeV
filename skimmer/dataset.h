@@ -18,6 +18,7 @@ class Dataset{
   bool isMC() const {return isMC_;};
   std::string getDir() const {return folderName_;};
   float getLumi() const {return lumi_;};
+  float getCrossSection() const {return crossSection_;};
   long getTotalEvents() const {return totalEvents_;};
   std::string getChannel() const {return channel_;};
   std::string getLegName() const {return legName_;};

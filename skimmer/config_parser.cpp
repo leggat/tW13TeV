@@ -25,7 +25,7 @@ int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec){
   float lumi;            
   bool isMC;             
   float crossSection;    
-  long long totalEvents;      
+  int totalEvents;      
   std::string channel;   
   std::string legName;   
   int colour;            

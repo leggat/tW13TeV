@@ -39,9 +39,18 @@ class Cuts{
   float bTagCut_;
   unsigned int nBJets_;
 
+  //Skimming trees and execution position variable
+  int skimStage_;
+  TTree* skimTree_;
+
+  //This number represents the weight of the dataset. This should be a dataset by dataset quantity, as it will be set only once per dataset used.
+  float datasetWeight_;
+  float eventWeight_;
+
   //Cut flow related variables go here
   bool doCutFlow_;
   TH1F* cutFlowTable_;
+  float cfInd_;
 
   //Cut related private methods
   bool makePVCuts(tWEvent*);
@@ -51,6 +60,7 @@ class Cuts{
   bool makeMuonCuts(tWEvent*);
   bool makeJetCuts(tWEvent*);
   bool makeBCuts(tWEvent*);
+  bool makeMETCuts(tWEvent*);
   std::vector<int> getTightMuons(tWEvent*);
   std::vector<int> getLooseMuons(tWEvent*);
   std::vector<int> getTightElectrons(tWEvent*);
@@ -68,4 +78,10 @@ class Cuts{
   //Set up how many leptons to select here. this is so that the main program can set this.
   void setNTightMuon(int nmuons){nMuonsTight_ = nmuons;};
     
+  //For setting up the skimming
+  void setSkimTree(int cutStage, TTree* cloneTree){skimStage_ = cutStage; skimTree_ = cloneTree;};
+
+  //Setting the dataset weight
+  void setDatasetWeight(float weight){datasetWeight_ = weight;};
+
 };

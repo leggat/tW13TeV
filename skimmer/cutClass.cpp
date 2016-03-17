@@ -37,10 +37,17 @@ Cuts::Cuts():
 
   nBJets_(1),
 
+  skimStage_(-1),
+  skimTree_(NULL),
+
+  //Set the datasetWeight. Defaults to one, the weight we want for data.
+  datasetWeight_(1.),
+  eventWeight_(1.), //Setting this up here because I'm gonna need it at some point and it would be annoying to go back and put it everywhere.
+
   //initialise cut flow things here. Don't do cutflows by default.
   doCutFlow_(false),
-  cutFlowTable_(NULL)
-
+  cutFlowTable_(NULL),
+  cfInd_(0.) //Used to track which bin in the cut flow we should be filling. This makes it so that if I add in extra places to check cut flow numbers I won't have to go through hard coding each bin number.
 {
   //Will put in a load of definitions heres.
 }
@@ -48,28 +55,57 @@ Cuts::Cuts():
 //The main cut method. This can be called once on an event of tWEvent class 
 bool Cuts::makeCuts(tWEvent* event){
 
-  if (doCutFlow_) cutFlowTable_->Fill(0.); //Fill cut flow table with pre-selection info
+  if (doCutFlow_) {
+    cfInd_ = 0.;
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_); //Fill cut flow table with pre-selection info
+    cfInd_++;
+  }
 
   //Make trigger selection
   if (!makeTriggerSelection(event)) return false;
 
-  if (doCutFlow_) cutFlowTable_->Fill(1.);
+  if (doCutFlow_){
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
+    cfInd_++;
+  }
 
   //Make primary vertex selections
   if (!makePVCuts(event)) return false;
 
-  if (doCutFlow_) cutFlowTable_->Fill(2.); //Post trigger selection
+  if (doCutFlow_){
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_); //Post trigger selection
+    cfInd_++;
+  }
 
   //Make lepton cuts
   if (!makeLeptonCuts(event)) return false;
+
+  //If skim stage is post lepton selection, fill the tree here.
+  if (skimStage_ == 0) skimTree_->Fill();
   
   if (!makeJetCuts(event)) return false;
   
-  if (doCutFlow_) cutFlowTable_->Fill(7.);
+  if(skimStage_ == 1) skimTree_->Fill(); //Fill clone tree if this is the stage we want.
+  if (doCutFlow_){
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
+    cfInd_++;
+  }
   
   if (!makeBCuts(event)) return false;
 
-  if (doCutFlow_) cutFlowTable_->Fill(8.);
+  if (doCutFlow_){
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
+    cfInd_++;
+  }
+
+  if (!makeMETCuts(event)) return false; //Currently placeholder.
+
+  if (skimStage_ == 2) skimTree_->Fill(); //Fill clone tree if selection stage is set to after everything.
+
+  if (doCutFlow_) {
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
+    cfInd_++;
+  }
 
   return true;
 
@@ -120,7 +156,12 @@ bool Cuts::makeLeptonCuts(tWEvent * event){
     }
   }
 
-  if (doCutFlow_) cutFlowTable_->Fill(6.);
+  //Here is where any lepton mass cuts should go.
+
+  if (doCutFlow_) {
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
+    cfInd_++;
+  }
 
   return true;
 
@@ -132,9 +173,9 @@ bool Cuts::makeMuonCuts(tWEvent * event){
   event->muonIndexTight = getTightMuons(event);
   event->muonIndexLoose = getLooseMuons(event);
   if (event->muonIndexTight.size() != nMuonsTight_) return false;
-  if (doCutFlow_) cutFlowTable_->Fill(3.);
+  if (doCutFlow_) {cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);cfInd_++;}
   if (event->muonIndexLoose.size() != nMuonsLoose_) return false;
-  if (doCutFlow_) cutFlowTable_->Fill(4.);
+  if (doCutFlow_) {cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);cfInd_++;}
   return true;
 }
 
@@ -145,6 +186,7 @@ std::vector<int> Cuts::getTightMuons(tWEvent* event){
 
   //Loop over muon candidates and add those that pass requirement into the list.
   for (unsigned int i = 0; i < event->Muon_pt->size(); i++){
+    if (!(event->Muon_isGlobal->at(i) && event->Muon_isTrackerMuon->at(i))) continue;
     if (event->Muon_pt->at(i) < muonPtCut_) continue;
     if (fabs(event->Muon_eta->at(i)) > muonEtaCut_) continue;
     if (event->Muon_relIsoDeltaBetaR04->at(i) > muonRelIsoCut_) continue;
@@ -161,6 +203,7 @@ std::vector<int> Cuts::getLooseMuons(tWEvent* event){
   std::vector<int> muonInd;
 
   for (unsigned int i = 0; i < event->Muon_pt->size(); i++){
+    if (!(event->Muon_isGlobal->at(i) || event->Muon_isTrackerMuon->at(i))) continue;
     if (event->Muon_pt->at(i) < muonLoosePt_) continue;
     if (fabs(event->Muon_eta->at(i)) > muonLooseEta_) continue;
     if (!event->Muon_loose->at(i)) continue;
@@ -176,7 +219,7 @@ bool Cuts::makeElectronCuts(tWEvent* event){
   //if (event->electronIndexTight.size() != nEleTight_) return false;
   event->electronIndexLoose = getLooseElectrons(event);
   if (event->electronIndexLoose.size() != nEleLoose_) return false;
-  if (doCutFlow_) cutFlowTable_->Fill(5.);
+  if (doCutFlow_){ cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_); cfInd_++;}
   return true;
 
 }
@@ -238,4 +281,9 @@ std::vector<int> Cuts::getBJets(tWEvent* event){
     bJetInds.push_back(event->jetIndex[i]);
   }
   return bJetInds;
+}
+
+//Placeholder for now. No cuts applied.
+bool Cuts::makeMETCuts(tWEvent*){
+  return true;
 }
