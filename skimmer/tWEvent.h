@@ -11,6 +11,7 @@
 #include <TROOT.h>
 #include <TChain.h>
 #include <TFile.h>
+#include "TLorentzVector.h"
 
 // Header file for the classes stored in the TTree if any.
 #include <vector>
@@ -719,7 +720,9 @@ public :
    std::vector<int> muonIndexLoose;
    std::vector<int> jetIndex;
    std::vector<int> bTagIndex;
-
+   TLorentzVector lepton1;
+   TLorentzVector lepton2;
+   
    // List of branches
    TBranch        *b_Gen_pt;   //!
    TBranch        *b_Gen_eta;   //!

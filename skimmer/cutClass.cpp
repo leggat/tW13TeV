@@ -26,6 +26,9 @@ Cuts::Cuts():
   nEleTight_(0),
   nEleLoose_(0),
 
+  zMass_(91.),
+  zMassWidth_(15.),
+
   //Initialise jet cuts here
   jetPtCut_(50.),
   jetEtaCut_(4.7),
@@ -33,7 +36,8 @@ Cuts::Cuts():
   nJets_(1),
 
   //b-jet variables
-  bTagCut_(0.935),
+  //bTagCut_(0.935), //Tight cut
+  bTagCut_(0.800), //Medium cut
 
   nBJets_(1),
 
@@ -156,7 +160,19 @@ bool Cuts::makeLeptonCuts(tWEvent * event){
     }
   }
 
+  if (doCutFlow_) {
+    cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
+    cfInd_++;
+  }
+
   //Here is where any lepton mass cuts should go.
+
+  //Z mass veto. Only do this if dilepton channel and same flavour leptons.
+  if (nMuonsTight_ == 2){
+    event->lepton1.SetPtEtaPhiE(event->Muon_pt->at(event->muonIndexTight[0]),event->Muon_eta->at(event->muonIndexTight[0]),event->Muon_phi->at(event->muonIndexTight[0]),event->Muon_energy->at(event->muonIndexTight[0]));
+    event->lepton2.SetPtEtaPhiE(event->Muon_pt->at(event->muonIndexTight[1]),event->Muon_eta->at(event->muonIndexTight[1]),event->Muon_phi->at(event->muonIndexTight[1]),event->Muon_energy->at(event->muonIndexTight[1]));
+    if (fabs((event->lepton1 + event->lepton2).M() - zMass_) < zMassWidth_) return false;
+  }
 
   if (doCutFlow_) {
     cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);

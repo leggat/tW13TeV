@@ -18,6 +18,7 @@ void show_usage(std::string name){
 	    << "\t-s\t--synch\tInitialise and use a synch cut flow.\n"
 	    << "\t-c\tCONF\tDataset config file\n"
 	    << "\t-m\tCUTSTAGE\tMake a skimmed tree at a defined point in the cuts.\n\t\t\t0 - Post lepton selection 1 - Post jet selection. 2 - Final event selecction I guess\n"
+	    << "\t-f\t\tOnly run over one file in each dataset. This is to speed up testing and so forth.\n"
 	    << std::endl;
 }
 
@@ -33,9 +34,23 @@ int main(int argc, char* argv[]){
   //At some point this should become a sum of lumis of the data being used, but for now it is hard-coded because I'm not looking at data yet. Or something.
   float integratedLuminosity = 2500;
 
-  bool makeCutFlow = false;
+  bool oneFileOnly = false;
 
-  while ((opt = getopt(argc,argv,"hsc:m:"))!=-1){
+  bool makeCutFlow = false;
+  std::vector<std::string> cutFlowStringList = 
+    {"nEvents         ",
+     "Trigger         ",
+     "PV              ",
+     "Tight muons     ",
+     "Loose muon veto ",
+     "Electron veto   ",
+     "Charge selection",
+     "Lepton mass     ",
+     "Jets            ",
+     "B tags          ",
+     "MET             "}; 
+
+  while ((opt = getopt(argc,argv,"hsc:m:f"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -49,6 +64,9 @@ int main(int argc, char* argv[]){
       break;
     case 'm':
       cutStage = atoi(optarg);
+      break;
+    case 'f':
+      oneFileOnly = true;
       break;
     case '?':
       if (optopt == 'c')
@@ -85,7 +103,7 @@ int main(int argc, char* argv[]){
   //TH1F* cutFlow = NULL;
   if (makeCutFlow){
     for (auto const & dataset : *datasets){
-      cutFlow[dataset.getName()] = new TH1F(("cutFlowTable"+dataset.getName()).c_str(),("cutFlowTable"+dataset.getName()).c_str(),10,0,10);
+      cutFlow[dataset.getName()] = new TH1F(("cutFlowTable"+dataset.getName()).c_str(),("cutFlowTable"+dataset.getName()).c_str(),cutFlowStringList.size(),0,cutFlowStringList.size());
     }
   }
 
@@ -110,8 +128,9 @@ int main(int argc, char* argv[]){
     TChain * datasetChain = new TChain("TNT/BOOM");
     
     //there will be a loop here to add all of the files to the chain. Now we're just doing one to test this whole thing works.
-    datasetChain->Add((dataset.getFolderName()+"OutTree_1.root").c_str());
-    //    datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
+    if (oneFileOnly) datasetChain->Add((dataset.getFolderName()+"OutTree_1.root").c_str());
+    else datasetChain->Add((dataset.getFolderName()+"OutTree_*.root").c_str());
+      // datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
     
     //If we're making a skim (which is, nominally, the point of this script, though it's probably just gonna become my eventual analysis script) then make the skimming file here.
     TTree * cloneTree;
@@ -149,7 +168,7 @@ int main(int argc, char* argv[]){
     if (makeCutFlow){
       std::cout << "Cut flow for " << dataset.getName() << std::endl;
       for (int cfInd = 1; cfInd < cutFlow[dataset.getName()]->GetXaxis()->GetNbins()+1; cfInd++){
-	std::cout << cfInd << " : " << cutFlow[dataset.getName()]->GetBinContent(cfInd) << std::endl;
+	std::cout << cutFlowStringList[cfInd-1] << " : " << cutFlow[dataset.getName()]->GetBinContent(cfInd) << std::endl;
       }
       
     }

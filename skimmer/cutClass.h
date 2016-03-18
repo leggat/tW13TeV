@@ -1,4 +1,4 @@
-
+#include "TLorentzVector.h"
 #include "tWEvent.h"
 #include <vector> 
 #include <iostream>
@@ -29,6 +29,10 @@ class Cuts{
 
   unsigned int nEleTight_;
   unsigned int nEleLoose_;
+
+  //Width and central value of the z mass that we veto on in dilepton events
+  float zMass_;
+  float zMassWidth_;
 
   //jet variables
   float jetPtCut_;
