@@ -2,6 +2,8 @@
 #include "tWEvent.h"
 #include <vector> 
 #include <iostream>
+#include "plots.h"
+#include <map>
 #include "TH1.h"
 
 class Cuts{
@@ -56,6 +58,10 @@ class Cuts{
   TH1F* cutFlowTable_;
   float cfInd_;
 
+  //Plots object if we're doing plots.
+  bool fillPlots_;
+  std::map<std::string,Plots*> plotObj_;
+
   //Cut related private methods
   bool makePVCuts(tWEvent*);
   bool makeTriggerSelection(tWEvent*);
@@ -78,6 +84,8 @@ class Cuts{
   
   //Setters go here
   void setCutFlowHistogram(TH1F* hist){cutFlowTable_ = hist; doCutFlow_ = true;};
+
+  void setPlots(std::map<std::string,Plots*> plotobj){plotObj_ = plotobj; fillPlots_ = true;};
 
   //Set up how many leptons to select here. this is so that the main program can set this.
   void setNTightMuon(int nmuons){nMuonsTight_ = nmuons;};

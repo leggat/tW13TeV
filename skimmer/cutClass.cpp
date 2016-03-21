@@ -51,7 +51,10 @@ Cuts::Cuts():
   //initialise cut flow things here. Don't do cutflows by default.
   doCutFlow_(false),
   cutFlowTable_(NULL),
-  cfInd_(0.) //Used to track which bin in the cut flow we should be filling. This makes it so that if I add in extra places to check cut flow numbers I won't have to go through hard coding each bin number.
+  cfInd_(0.), //Used to track which bin in the cut flow we should be filling. This makes it so that if I add in extra places to check cut flow numbers I won't have to go through hard coding each bin number.
+
+  //Tells the cut object not to fill the histograms by default. Only do it if the histo map is set externally.
+  fillPlots_(false)
 {
   //Will put in a load of definitions heres.
 }
@@ -86,10 +89,12 @@ bool Cuts::makeCuts(tWEvent* event){
 
   //If skim stage is post lepton selection, fill the tree here.
   if (skimStage_ == 0) skimTree_->Fill();
+  if (fillPlots_) plotObj_["lepSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,0);
   
   if (!makeJetCuts(event)) return false;
   
   if(skimStage_ == 1) skimTree_->Fill(); //Fill clone tree if this is the stage we want.
+  if (fillPlots_) plotObj_["jetSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,1);
   if (doCutFlow_){
     cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
     cfInd_++;
@@ -105,6 +110,7 @@ bool Cuts::makeCuts(tWEvent* event){
   if (!makeMETCuts(event)) return false; //Currently placeholder.
 
   if (skimStage_ == 2) skimTree_->Fill(); //Fill clone tree if selection stage is set to after everything.
+  if (fillPlots_) plotObj_["fullSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,2);
 
   if (doCutFlow_) {
     cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);

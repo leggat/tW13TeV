@@ -1,7 +1,7 @@
 #include "config_parser.h"
 #include <string>
 
-int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec){
+int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec, std::vector<std::string>* plotsToFill){
   libconfig::Config config;
 
   try {

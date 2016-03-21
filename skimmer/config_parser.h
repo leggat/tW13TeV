@@ -7,5 +7,5 @@
 #include<iostream>
 
 namespace Parser {
-  int parse_datasets(char*,std::vector<Dataset>*);
+  int parse_datasets(char*,std::vector<Dataset>*,std::vector<std::string>*);
 }
