@@ -104,7 +104,7 @@ int main(int argc, char* argv[]){
   std::vector<std::string> legOrder = {};
   std::vector<std::string> plotOrder = {};
   Parser::parse_datasets(configFile, datasets, plotsToFill, &legOrder, &plotOrder);
-  
+
   if (datasets->size() == 0){
     std::cout << "Please use a dataset config file with -c argument. Exiting..." << std::endl;
     return 0.;
@@ -118,7 +118,9 @@ int main(int argc, char* argv[]){
   //TH1F* cutFlow = NULL;
   if (makeCutFlow){
     for (auto const & dataset : *datasets){
-      cutFlow[dataset.getName()] = new TH1F(("cutFlowTable"+dataset.getName()).c_str(),("cutFlowTable"+dataset.getName()).c_str(),cutFlowStringList.size(),0,cutFlowStringList.size());
+      if (cutFlow.find(dataset.getLegName()) == cutFlow.end()){
+	cutFlow[dataset.getLegName()] = new TH1F(("cutFlowTable"+dataset.getLegName()).c_str(),("cutFlowTable"+dataset.getLegName()).c_str(),cutFlowStringList.size(),0,cutFlowStringList.size());
+      }
     }
   }
 
@@ -148,7 +150,7 @@ int main(int argc, char* argv[]){
     std::cout << "Processing dataset " << dataset.getName();
     //Do some initialisations of stuff on a per-database basis here.
     //First update the cut flow table if we're doing that.
-    if (makeCutFlow) cutObj->setCutFlowHistogram(cutFlow[dataset.getName()]);
+    if (makeCutFlow) cutObj->setCutFlowHistogram(cutFlow[dataset.getLegName()]);
     
     //Next set up the plots that we want to fill if we're making plots.
     if (plotConf) cutObj->setPlots(plotMap[dataset.getLegName()]);
@@ -185,7 +187,7 @@ int main(int argc, char* argv[]){
     //Begin loop over all events
     int numberSelected = 0;
     for ( int evtInd = 0; evtInd < numberOfEntries; evtInd++){
-      if (evtInd % 500 < 0.01) std::cerr << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " \r";
+      if (evtInd % 500 < 0.01) std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " \r";
       event->GetEntry(evtInd);
       //Make the cuts!
       if (!cutObj->makeCuts(event)) continue;
@@ -204,8 +206,8 @@ int main(int argc, char* argv[]){
 
     if (makeCutFlow){
       std::cout << "Cut flow for " << dataset.getName() << std::endl;
-      for (int cfInd = 1; cfInd < cutFlow[dataset.getName()]->GetXaxis()->GetNbins()+1; cfInd++){
-	std::cout << cutFlowStringList[cfInd-1] << " : " << cutFlow[dataset.getName()]->GetBinContent(cfInd) << std::endl;
+      for (int cfInd = 1; cfInd < cutFlow[dataset.getLegName()]->GetXaxis()->GetNbins()+1; cfInd++){
+	std::cout << cutFlowStringList[cfInd-1] << " : " << cutFlow[dataset.getLegName()]->GetBinContent(cfInd) << std::endl;
       }
       
     }
@@ -213,16 +215,17 @@ int main(int argc, char* argv[]){
   } // Close dataset loop
 
   //Make the plots if we're doing that
+  HistogramPlotter plotObj = HistogramPlotter(legOrder,plotOrder,datasetInfos);
+  plotObj.setLabelOne("CMS Preliminary");
+  plotObj.setLabelTwo("2.5 fb^{-1} or something");
+  plotObj.setPostfix("");
+  plotObj.setOutputFolder(plotOutDir);
+ 
   if (plotConf){
-    HistogramPlotter plotObj = HistogramPlotter(legOrder,plotOrder,datasetInfos);
-    plotObj.setLabelOne("CMS Preliminary");
-    plotObj.setLabelTwo("2.5 fb^{-1} or something");
-    plotObj.setPostfix("");
-    plotObj.setOutputFolder(plotOutDir);
     plotObj.plotHistos(plotMap);
-    /*    for (auto & plotMapIter : plotMap){
-      plotObj.plotHistos(plotMapIter);
-      }*/ 
+  }
+  if (makeCutFlow){
+    plotObj.makePlot(cutFlow,"cutFlow",cutFlowStringList);
   }
   
   //delete the plots here.
