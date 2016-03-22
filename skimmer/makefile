@@ -7,8 +7,8 @@ ROOTSYS = /cvmfs/cms.cern.ch/slc6_amd64_gcc481/lcg/root/5.34.18-cms2/
 
 default: tWAnal
 
-tWAnal: skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o
-	$(CC) $(CFLAGS) $(LIBS) -o tWAnal skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o
+tWAnal: skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o histogramPlotter.o
+	$(CC) $(CFLAGS) $(LIBS) -o tWAnal skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o histogramPlotter.o
 
 skimMain.o: skimMain.cpp
 	$(CC) $(CFLAGS) $(LIBS) -c skimMain.cpp
@@ -27,3 +27,6 @@ config_parser.o: config_parser.cpp config_parser.h
 
 plots.o: plots.cpp plots.h
 	$(CC) $(CFLAGS) $(LIBS) -c plots.cpp
+
+histogramPlotter.o: histogramPlotter.cpp histogramPlotter.h
+	$(CC) $(CFLAGS) $(LIBS) -c histogramPlotter.cpp

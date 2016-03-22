@@ -17,6 +17,7 @@ class Plots{
   Plots(std::string, std::string);
   ~Plots();
   void fillAllPlots(tWEvent*,float,int);
+  std::vector<plot> getPlotsVec(){return plotsVec;};
 };
 
 struct plot{

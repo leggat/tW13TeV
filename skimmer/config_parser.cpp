@@ -1,7 +1,7 @@
 #include "config_parser.h"
 #include <string>
 
-int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec, std::vector<std::string>* plotsToFill){
+int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec, std::vector<std::string>* plotsToFill, std::vector<std::string> * legOrder, std::vector<std::string> * plotOrder){
   libconfig::Config config;
 
   try {
@@ -43,6 +43,20 @@ int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec, std::ve
     dSet.lookupValue("colour",colour);
     dSet.lookupValue("extraFlags",extraFlags);
     datasetVec->push_back(Dataset(name,folderName,lumi,isMC,crossSection,totalEvents,channel,legName,colour,extraFlags));
+  }
+
+  if (root.exists("plotOrder")){
+    const libconfig::Setting &pOrder = root["plotOrder"];
+    for (int i = 0; i < pOrder.getLength(); i++){
+      plotOrder->push_back(pOrder[i]);
+    }
+  }
+
+  if (root.exists("legOrder")){
+    const libconfig::Setting &pOrder = root["legOrder"];
+    for (int i = 0; i < pOrder.getLength(); i++){
+      legOrder->push_back(pOrder[i]);
+    }
   }
 
   return 1;
