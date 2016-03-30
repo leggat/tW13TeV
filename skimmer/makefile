@@ -7,6 +7,9 @@ ROOTSYS = /cvmfs/cms.cern.ch/slc6_amd64_gcc481/lcg/root/5.34.18-cms2/
 
 default: tWAnal
 
+condor: skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o histogramPlotter.o
+	condor_compile $(CC) $(CFLAGS) $(LIBS) -o tWAnalCondor skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o histogramPlotter.o
+
 tWAnal: skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o histogramPlotter.o
 	$(CC) $(CFLAGS) $(LIBS) -o tWAnal skimMain.o tWEvent.o cutClass.o dataset.o config_parser.o plots.o histogramPlotter.o
 

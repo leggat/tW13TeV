@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "tWEvent.h"
 #include "cutClass.h"
 #include <getopt.h>
@@ -12,17 +14,41 @@
 #include "histogramPlotter.h"
 #include "plots.h"
 #include "TH1.h"
+#include <sys/stat.h>
+
+
+int getStartFile(std::string name,std::string stage){
+  //
+  struct stat buffer;
+  int i = 0;
+  for (i = 0; i < 50; i++){
+    if (stat(("skims/"+name+stage+std::to_string(i)+".root").c_str(), &buffer) != 0) break;
+  }
+  return i * 50 + 1;
+}
+
+bool addFilesToChain(TChain * chain, std::string folderName, int startFile, int nFiles){
+  chain->Reset();
+  for (int i = startFile; i <= startFile+49; i++){
+    if (i > nFiles) break;
+    chain->Add((folderName+"OutTree_"+std::to_string(i)+".root").c_str());
+    
+  }
+  return true;
+}
 
 void show_usage(std::string name){
   std::cerr << "Usage: " << name << " <options(s)>"
 	    << "Options:\n"
-	    <<"\t-h,--help\tShow this message\n"
+ 	    <<"\t-h,--help\tShow this message\n"
 	    << "\t-s\t--synch\tInitialise and use a synch cut flow.\n"
 	    << "\t-d\tDATASETCONF\tDataset config file\n"
 	    << "\t-m\tCUTSTAGE\tMake a skimmed tree at a defined point in the cuts.\n\t\t\t0 - Post lepton selection 1 - Post jet selection. 2 - Final event selecction I guess\n"
 	    << "\t-f\t\tOnly run over one file in each dataset. This is to speed up testing and so forth.\n"
 	    << "\t-p\tPLOTCONF\tPlot config file. Leave blank for no plots.\n"
 	    << "\t-o\tPLOTOUTDIR\tThe directory the plots will be written to. Defaults to plots/\n"
+	    << "\t-u\tCUTSTAGE\tRun the skimmer over previously made skims. Arguments are the same as for the making."
+	    << "\t-a\t\tSkip previously finished skims. This is because it keeps crashing for no obvious reason."
 	    << std::endl;
 }
 
@@ -31,9 +57,11 @@ int main(int argc, char* argv[]){
   //Parse command line arguments here!
   int opt;
   int cutStage = -1;
+  int skimToUse = -1;
   std::vector<std::string> cutStageNameVec = {"lepSel","jetSel","fullSel"};
   char * configFile = NULL;
   char * plotConf = NULL;
+  bool skipPreviousSkims = false;
   const char * plotOutDir = "plots/";
 
   //The integrated luminosity of the data being used. 
@@ -56,7 +84,7 @@ int main(int argc, char* argv[]){
      "B tags          ",
      "MET             "}; 
 
-  while ((opt = getopt(argc,argv,"hsd:m:fp:o:"))!=-1){
+  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:a"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -80,8 +108,14 @@ int main(int argc, char* argv[]){
     case 'o':
       plotOutDir = optarg;
       break;
+    case 'u':
+      skimToUse = atoi(optarg);
+      break;
+    case 'a':
+      skipPreviousSkims = true;
+      break;
     case '?':
-      if (optopt == 'd' || optopt == 'p' || optopt == 'o')
+      if (optopt == 'd' || optopt == 'p' || optopt == 'o' || optopt == 'u')
 	fprintf(stderr, "Option -%c requires an argument. \n", optopt);
       return 0;
     default:
@@ -165,11 +199,22 @@ int main(int argc, char* argv[]){
 
     //The name should maybe be customisable?
     TChain * datasetChain = new TChain("TNT/BOOM");
-    
+
+    int startFile = 1;
+    if (skipPreviousSkims) startFile = getStartFile(dataset.getName(),cutStageNameVec[cutStage]);
+
     //there will be a loop here to add all of the files to the chain. Now we're just doing one to test this whole thing works.
-    if (oneFileOnly) datasetChain->Add((dataset.getFolderName()+"OutTree_1.root").c_str());
-    else datasetChain->Add((dataset.getFolderName()+"OutTree_*.root").c_str());
+    if (skimToUse < 0){
+      if (oneFileOnly) datasetChain->Add((dataset.getFolderName()+"OutTree_1.root").c_str());
+      else addFilesToChain(datasetChain,dataset.getFolderName(),startFile,dataset.getnFiles());
+    }
+    else {
+      datasetChain->Add(("skims/"+dataset.getName()+"/skimTree*.root").c_str());
+    }
       // datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
+
+    tWEvent * event = new tWEvent(datasetChain);
+    
     
     //If we're making a skim (which is, nominally, the point of this script, though it's probably just gonna become my eventual analysis script) then make the skimming file here.
     TTree * cloneTree;
@@ -178,26 +223,62 @@ int main(int argc, char* argv[]){
       cutObj->setSkimTree(cutStage,cloneTree);
     }
 
-    tWEvent * event = new tWEvent(datasetChain);
+    //This variable is used for saving the tree part way through production if the number of selected events exceeds a certain amount.
+    int nSkimFiles = (startFile - 1) / 50.;
 
-    int numberOfEntries = datasetChain->GetEntries();
-    
-    std::cout << "Tree to be prossessed contains " << numberOfEntries << " entries." << std::endl;
 
     //Begin loop over all events
     int numberSelected = 0;
-    for ( int evtInd = 0; evtInd < numberOfEntries; evtInd++){
-      if (evtInd % 500 < 0.01) std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " \r";
-      event->GetEntry(evtInd);
-      //Make the cuts!
-      if (!cutObj->makeCuts(event)) continue;
-      numberSelected++;
-    } //Close loop over all events
+    do{
+      int numberOfEntries = datasetChain->GetEntries();
+      std::cout << "Tree to be processed contains " << numberOfEntries << " entries." << std::endl;
+
+      int maxFiles = dataset.getnFiles();
+      int upperFile = startFile + 49 > maxFiles? maxFiles:startFile+49;
+      std::cout << std::endl << "Processing files " << startFile << "-" << upperFile << std::endl;
+      for ( int evtInd = 0; evtInd < numberOfEntries; evtInd++){
+	if (evtInd % 5000 < 0.01) {
+	  if (cutStage > -1) std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " and number in clone tree: " << cloneTree->GetEntries() << " \r";
+	  else  std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " \r";
+	}
+	//Gonna see if the output tree being too big is the reason it's being terminated. The other option is that it's the input tree being too big, which would be much harder to solve.
+	// I originally put this after the sleection requirements which obviously does not turn out like I plan it to.
+	if (cutStage > -1){
+	  if (cloneTree->GetEntries() > 9999){
+	    std::cout << std::endl << "Tree contains " << cloneTree->GetEntries() << " events, so we're now saving a skim. This is skim #" << nSkimFiles << std::endl;
+	    TFile cloneFile(("skims/"+dataset.getName()+cutStageNameVec[cutStage]+std::to_string(nSkimFiles)+".root").c_str(),"RECREATE");
+	    cloneFile.cd();
+	    cloneTree->Write();
+	    cloneFile.Write();
+	    cloneFile.Close();
+	    nSkimFiles++;
+	    delete cloneTree;
+	    cloneTree = datasetChain->CloneTree(0);
+	    cutObj->setSkimTree(cloneTree);
+	  }
+	}
+	
+	
+	event->GetEntry(evtInd);
+	//Make the cuts!
+	if (!cutObj->makeCuts(event)) continue;
+	numberSelected++;
+	
+      } //Close loop over all events in that one tree.
+      if (skimToUse < 0){
+	//Load next tree
+	startFile+=50;
+	addFilesToChain(datasetChain,dataset.getFolderName(),startFile,dataset.getnFiles());
+	delete event;
+	event = new tWEvent(datasetChain);
+      }
+    }while(startFile < dataset.getnFiles() && skimToUse < 0);
+
     std::cout << std::endl; //Add in a line break after the status bar thing.
 
     //Save the clone trees here
     if (cutStage > -1){
-      TFile cloneFile(("skims/"+dataset.getName()+cutStageNameVec[cutStage]+".root").c_str(),"RECREATE");
+      TFile cloneFile(("skims/"+dataset.getName()+cutStageNameVec[cutStage]+std::to_string(nSkimFiles)+".root").c_str(),"RECREATE");
       cloneFile.cd();
       cloneTree->Write();
       cloneFile.Write();

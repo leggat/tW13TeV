@@ -25,7 +25,7 @@ int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec, std::ve
   float lumi;            
   bool isMC;             
   float crossSection;    
-  int totalEvents;      
+  int totalEvents, nFiles;      
   std::string channel;   
   std::string legName;   
   int colour;            
@@ -41,8 +41,9 @@ int Parser::parse_datasets(char* conf, std::vector<Dataset>* datasetVec, std::ve
     dSet.lookupValue("channel",channel);
     dSet.lookupValue("legName",legName);
     dSet.lookupValue("colour",colour);
+    dSet.lookupValue("nFiles",nFiles);
     dSet.lookupValue("extraFlags",extraFlags);
-    datasetVec->push_back(Dataset(name,folderName,lumi,isMC,crossSection,totalEvents,channel,legName,colour,extraFlags));
+    datasetVec->push_back(Dataset(name,folderName,lumi,isMC,crossSection,totalEvents,channel,legName,colour,extraFlags,nFiles));
   }
 
   if (root.exists("plotOrder")){

@@ -11,8 +11,9 @@ class Dataset{
   std::string legName_;
   int colour_;
   std::string extraFlags_;
+  int nFiles_;
  public:
-  Dataset(std::string, std::string, float, bool, float, long, std::string, std::string, int, std::string);
+  Dataset(std::string, std::string, float, bool, float, long, std::string, std::string, int, std::string, int);
   std::string getName() const {return name_;};
   std::string getFolderName() const {return folderName_;};
   bool isMC() const {return isMC_;};
@@ -24,4 +25,5 @@ class Dataset{
   std::string getLegName() const {return legName_;};
   int getColour() const {return colour_;};
   std::string exFlags() const {return extraFlags_;};
+  int getnFiles() const {return nFiles_;};
 };

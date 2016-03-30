@@ -92,6 +92,7 @@ class Cuts{
     
   //For setting up the skimming
   void setSkimTree(int cutStage, TTree* cloneTree){skimStage_ = cutStage; skimTree_ = cloneTree;};
+  void setSkimTree(TTree* cloneTree){skimTree_ = cloneTree;};
 
   //Setting the dataset weight
   void setDatasetWeight(float weight){datasetWeight_ = weight;};
