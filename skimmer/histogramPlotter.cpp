@@ -60,10 +60,13 @@ HistogramPlotter::~HistogramPlotter(){
   delete labelThree_;
 }
 
-void HistogramPlotter::plotHistos(std::map<std::string, std::map<std::string, Plots*> > plotMap){
+void HistogramPlotter::plotHistos(std::map<std::string, std::map<std::string, Plots*> > plotMap, bool makeLatex){
   //Get a list of keys from the map.
   std::map<std::string, std::map<std::string,Plots*> >::iterator firstIt = plotMap.begin();
   std::vector<std::string> stageNameVec;
+
+  if (makeLatex) createLatexFile();
+
   for (std::map<std::string,Plots*>::iterator stageNameIt = firstIt->second.begin(); stageNameIt != firstIt->second.end(); stageNameIt++){
     stageNameVec.push_back(stageNameIt->first);
   }
@@ -75,26 +78,29 @@ void HistogramPlotter::plotHistos(std::map<std::string, std::map<std::string, Pl
       for (std::map<std::string,std::map<std::string,Plots*> >::iterator mapIt = plotMap.begin(); mapIt != plotMap.end(); mapIt++){
 	tempPlotMap[mapIt->first] = mapIt->second[*stageIt]->getPlotsVec()[i].hist;
       }
-      makePlot(tempPlotMap,firstIt->second[*stageIt]->getPlotsVec()[i].name,*stageIt);
+      makePlot(tempPlotMap,firstIt->second[*stageIt]->getPlotsVec()[i].name,*stageIt,firstIt->second[*stageIt]->getPlotsVec()[i].xAxisLabel);
     }
+    if (makeLatex) addSlideToLatexFile(firstIt->second.begin()->second->getPlotsVec()[i].name,stageNameVec);
   }
+
+  if (makeLatex) closeLatexFile();
 }
 
 void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::string plotName){
   std::vector<std::string> blankLabels;
-  makePlot(plotMap,plotName,"",blankLabels);
+  makePlot(plotMap,plotName,"","",blankLabels);
 }
 
 void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::string plotName, std::vector<std::string> xAxisLabels){
-  makePlot(plotMap,plotName,"",xAxisLabels);
+  makePlot(plotMap,plotName,"","",xAxisLabels);
 }
 
-void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::string plotName, std::string subLabel){
+void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::string plotName, std::string subLabel, std::string xAxisTitle){
   std::vector<std::string> blankLabels;
-  makePlot(plotMap,plotName,subLabel,blankLabels);
+  makePlot(plotMap,plotName,subLabel,xAxisTitle,blankLabels);
 }  
 
-void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::string plotName, std::string subLabel, std::vector<std::string> xAxisLabels){
+void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::string plotName, std::string subLabel, std::string xAxisTitle, std::vector<std::string> xAxisLabels){
   std::cerr << "Making a plot called: " << plotName << std::endl;
   //Make the legend. This is clearly the first thing I should do.
   TLegend legend_ = TLegend(0.7,0.7,0.94,0.94);
@@ -124,6 +130,8 @@ void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::strin
   canvy->cd();
 
   mcStack.Draw("");
+
+  mcStack.GetXaxis()->SetTitle(xAxisTitle.c_str());
 
   if (xAxisLabels.size() > 0){
     for (unsigned int i = 1; i <= xAxisLabels.size(); i++){
@@ -169,4 +177,31 @@ void HistogramPlotter::setLabelTextSize(float size){
   labelOne_->SetTextSize(size);
   labelTwo_->SetTextSize(size);
   labelThree_->SetTextSize(size);
+}
+
+void HistogramPlotter::createLatexFile(){
+  latexFile_ = new ofstream(outputFolder_ + "allPlotLatex.tex");
+  *latexFile_ << "\\documentclass{beamer}\n\\usetheme{Warsaw}\n\n\\usepackage{graphicx}\n\\useoutertheme{infolines}\n\\setbeamertemplate{headline}{}\n\n\\begin{document}\n\n";
+}
+
+void HistogramPlotter::closeLatexFile(){
+  *latexFile_ << "\\end{document}";
+  latexFile_->close();
+}
+
+void HistogramPlotter::addSlideToLatexFile(std::string plotName, std::vector<std::string> stageNames){
+  std::vector<std::string> logOrNot = {"","_log"};
+  std::vector<std::string> lN = {""," log"};
+  for (int i = 0; i < 2; i++){
+    *latexFile_ << "\\frame{\n\\frametitle{"+plotName+lN[i]+"}\n";
+    int nLines = 0;
+    for (auto const & stage: stageNames){
+      *latexFile_ << "\\includegraphics[width=0.45\\textwidth]{"+plotName+stage+logOrNot[i]+".png}";
+      nLines++;
+      if (nLines % 2 == 0) *latexFile_ << "\\\\";
+      *latexFile_ << "\n";
+    }
+    *latexFile_ << "}\n";
+  }
+
 }

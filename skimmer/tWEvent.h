@@ -721,7 +721,9 @@ public :
    std::vector<int> jetIndex;
    std::vector<int> bTagIndex;
    TLorentzVector lepton1;
+   float lepton1RelIso;
    TLorentzVector lepton2;
+   float lepton2RelIso;
    
    // List of branches
    TBranch        *b_Gen_pt;   //!

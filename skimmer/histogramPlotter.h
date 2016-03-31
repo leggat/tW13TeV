@@ -5,6 +5,7 @@
 #include "plots.h"
 #include "TColor.h"
 #include "TPaveText.h"
+#include <fstream>
 
 typedef struct datasetInfo datasetInfo;
 
@@ -24,6 +25,11 @@ class HistogramPlotter{
   TPaveText * labelTwo_;
   TPaveText * labelThree_;
 
+  //Variables and methods to book a latex file that maps out all of the plots we make.
+  ofstream * latexFile_;
+  void createLatexFile();
+  void closeLatexFile();
+  void addSlideToLatexFile(std::string plotName, std::vector<std::string> stages);
 
  public:
  //Constructor
@@ -39,12 +45,15 @@ class HistogramPlotter{
   void setOutputFolder(std::string output){outputFolder_ = output;};
   void changeExtensions(std::vector<std::string> extentions){extensions_ = extentions;};
   //Actual plotting commands
-  void plotHistos(std::map<std::string, std::map<std::string, Plots*> >);
+  void plotHistos(std::map<std::string, std::map<std::string, Plots*> >, bool makeLatex = false);
   void plotCutFlows(std::map<std::string, TH1F*>);
   void makePlot(std::map<std::string, TH1F*>,std::string);
-  void makePlot(std::map<std::string, TH1F*>,std::string,std::string); //Adds a subLabel to the plot.
+  void makePlot(std::map<std::string, TH1F*>,std::string,std::string,std::string); //Adds a subLabel to the plot.
   void makePlot(std::map<std::string, TH1F*>,std::string,std::vector<std::string>); //Adds x-axis bin labels to the plot.
-  void makePlot(std::map<std::string, TH1F*>,std::string,std::string,std::vector<std::string>); //Adds a subLabel AND bin labels to the plot. Might get confusing later. May come up with another name.
+  void makePlot(std::map<std::string, TH1F*>,std::string,std::string,std::string,std::vector<std::string>); //Adds a subLabel AND bin labels to the plot. Might get confusing later. May come up with another name.
+  
+  //These methods are so that we can initialise and close a latex file that will contain the created plots in one place.
+
 };
 
 struct datasetInfo{

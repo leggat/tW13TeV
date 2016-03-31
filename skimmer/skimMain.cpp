@@ -209,6 +209,8 @@ int main(int argc, char* argv[]){
       else addFilesToChain(datasetChain,dataset.getFolderName(),startFile,dataset.getnFiles());
     }
     else {
+      delete datasetChain;
+      datasetChain = new TChain("BOOM");
       datasetChain->Add(("skims/"+dataset.getName()+"/skimTree*.root").c_str());
     }
       // datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
@@ -303,7 +305,7 @@ int main(int argc, char* argv[]){
   plotObj.setOutputFolder(plotOutDir);
  
   if (plotConf){
-    plotObj.plotHistos(plotMap);
+    plotObj.plotHistos(plotMap,true);
   }
   if (makeCutFlow){
     plotObj.makePlot(cutFlow,"cutFlow",cutFlowStringList);

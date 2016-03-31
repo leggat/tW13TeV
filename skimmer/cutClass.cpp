@@ -176,7 +176,9 @@ bool Cuts::makeLeptonCuts(tWEvent * event){
   //Z mass veto. Only do this if dilepton channel and same flavour leptons.
   if (nMuonsTight_ == 2){
     event->lepton1.SetPtEtaPhiE(event->Muon_pt->at(event->muonIndexTight[0]),event->Muon_eta->at(event->muonIndexTight[0]),event->Muon_phi->at(event->muonIndexTight[0]),event->Muon_energy->at(event->muonIndexTight[0]));
+    event->lepton1RelIso = event->Muon_relIsoDeltaBetaR04->at(0);
     event->lepton2.SetPtEtaPhiE(event->Muon_pt->at(event->muonIndexTight[1]),event->Muon_eta->at(event->muonIndexTight[1]),event->Muon_phi->at(event->muonIndexTight[1]),event->Muon_energy->at(event->muonIndexTight[1]));
+    event->lepton2RelIso = event->Muon_relIsoDeltaBetaR04->at(1);
     if (fabs((event->lepton1 + event->lepton2).M() - zMass_) < zMassWidth_) return false;
   }
 
