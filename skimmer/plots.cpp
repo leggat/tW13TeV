@@ -76,13 +76,13 @@ void Plots::fillAllPlots(tWEvent* event, float weight, int cutStage){
     if (plotsVec[i].name == "nJets" && cutStage > 0){
       plotsVec[i].hist->Fill(event->jetIndex.size(),weight);
     }
-    if (plotsVec[i].name == "jet1Pt" && cutStage > 0){
+    if (plotsVec[i].name == "jet1Pt" && cutStage > 0 && event->jetIndex.size() > 0){
       plotsVec[i].hist->Fill(event->Jet_pt->at(event->jetIndex[0]),weight);
     }
-    if (plotsVec[i].name == "jet1Eta" && cutStage > 0){
+    if (plotsVec[i].name == "jet1Eta" && cutStage > 0 && event->jetIndex.size() > 0){
       plotsVec[i].hist->Fill(event->Jet_eta->at(event->jetIndex[0]),weight);
     }
-    if (plotsVec[i].name == "jet1Tag" && cutStage > 0){
+    if (plotsVec[i].name == "jet1Tag" && cutStage > 0 && event->jetIndex.size() > 0){
       plotsVec[i].hist->Fill(event->Jet_pfCombinedInclusiveSecondaryVertexV2BJetTags->at(event->jetIndex[0]),weight);
     }
     if (plotsVec[i].name == "nBJets" && cutStage > 1){

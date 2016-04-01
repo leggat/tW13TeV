@@ -58,7 +58,7 @@ int main(int argc, char* argv[]){
   int opt;
   int cutStage = -1;
   int skimToUse = -1;
-  std::vector<std::string> cutStageNameVec = {"lepSel","jetSel","fullSel"};
+  std::vector<std::string> cutStageNameVec = {"lepSel","jetSel","bTag","fullSel"};
   char * configFile = NULL;
   char * plotConf = NULL;
   bool skipPreviousSkims = false;
@@ -236,12 +236,14 @@ int main(int argc, char* argv[]){
       std::cout << "Tree to be processed contains " << numberOfEntries << " entries." << std::endl;
 
       int maxFiles = dataset.getnFiles();
-      int upperFile = startFile + 49 > maxFiles? maxFiles:startFile+49;
+      int upperFile = maxFiles;
+      if (skimToUse > -1 && startFile + 49 > maxFiles) upperFile = startFile+49;
       std::cout << std::endl << "Processing files " << startFile << "-" << upperFile << std::endl;
       for ( int evtInd = 0; evtInd < numberOfEntries; evtInd++){
 	if (evtInd % 5000 < 0.01) {
 	  if (cutStage > -1) std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " and number in clone tree: " << cloneTree->GetEntries() << " \r";
 	  else  std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " \r";
+	  std::cout.flush();
 	}
 	//Gonna see if the output tree being too big is the reason it's being terminated. The other option is that it's the input tree being too big, which would be much harder to solve.
 	// I originally put this after the sleection requirements which obviously does not turn out like I plan it to.

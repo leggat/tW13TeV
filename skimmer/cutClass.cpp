@@ -30,8 +30,8 @@ Cuts::Cuts():
   zMassWidth_(15.),
 
   //Initialise jet cuts here
-  jetPtCut_(50.),
-  jetEtaCut_(4.7),
+  jetPtCut_(30.),
+  jetEtaCut_(2.4),
 
   nJets_(1),
 
@@ -89,18 +89,19 @@ bool Cuts::makeCuts(tWEvent* event){
 
   //If skim stage is post lepton selection, fill the tree here.
   if (skimStage_ == 0) skimTree_->Fill();
-  if (fillPlots_) plotObj_["lepSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,0);
   
   if (!makeJetCuts(event)) return false;
   
   if(skimStage_ == 1) skimTree_->Fill(); //Fill clone tree if this is the stage we want.
-  if (fillPlots_) plotObj_["jetSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,1);
+
   if (doCutFlow_){
     cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
     cfInd_++;
   }
   
   if (!makeBCuts(event)) return false;
+
+  if (skimStage_ == 2) skimTree_->Fill(); //Fill clone tree if selection stage is set to after everything.
 
   if (doCutFlow_){
     cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
@@ -109,8 +110,8 @@ bool Cuts::makeCuts(tWEvent* event){
 
   if (!makeMETCuts(event)) return false; //Currently placeholder.
 
-  if (skimStage_ == 2) skimTree_->Fill(); //Fill clone tree if selection stage is set to after everything.
-  if (fillPlots_) plotObj_["fullSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,2);
+  if (skimStage_ == 3) skimTree_->Fill(); //Fill clone tree if selection stage is set to after everything.
+  if (fillPlots_) plotObj_["fullSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,3);
 
   if (doCutFlow_) {
     cutFlowTable_->Fill(cfInd_,datasetWeight_*eventWeight_);
@@ -152,6 +153,8 @@ bool Cuts::makeLeptonCuts(tWEvent * event){
 
   if (!makeMuonCuts(event)) return false;
   if (!makeElectronCuts(event)) return false;
+
+  if (fillPlots_) plotObj_["lepSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,0);
 
   //If dilepton channel, check leptons are opposite sign
   if (nMuonsTight_ + nEleTight_ == 2){
@@ -269,6 +272,7 @@ std::vector<int> Cuts::getLooseElectrons(tWEvent* event){
 //Make jet cuts here
 bool Cuts::makeJetCuts(tWEvent* event){
   event->jetIndex = getJets(event);
+  if (fillPlots_) plotObj_["jetSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,1);
   if (event->jetIndex.size() != nJets_) return false;
   return true;
 }
@@ -293,6 +297,7 @@ std::vector<int> Cuts::getJets(tWEvent* event){
 //Let's do some b-jet cuts!
 bool Cuts::makeBCuts(tWEvent* event){
   event->bTagIndex = getBJets(event);
+  if (fillPlots_) plotObj_["bTag"]->fillAllPlots(event,datasetWeight_*eventWeight_,2);
   if (event->bTagIndex.size() != nBJets_) return false;
   return true;
 }

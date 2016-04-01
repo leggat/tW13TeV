@@ -112,7 +112,7 @@ void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::strin
   }
     
   //Initialise the stack
-  THStack mcStack = THStack(plotName.c_str(),plotName.c_str());
+  THStack mcStack = THStack((plotName+"_"+subLabel).c_str(),(plotName+"_"+subLabel).c_str());
   //Do a few colour changing things and add MC to the stack.
   for (std::vector<std::string>::const_iterator plot_iter = plotOrder_.begin(); plot_iter != plotOrder_.end(); plot_iter++){
     plotMap[*plot_iter]->SetFillColor(dsetMap_[*plot_iter].colour);
