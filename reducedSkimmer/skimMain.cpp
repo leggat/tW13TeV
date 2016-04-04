@@ -46,7 +46,7 @@ int main(int argc, char* argv[]){
   int numSelEles = 0;
 
   int beginFileNumber = -1;
-  int endFileNumber = -1.;
+  int endFileNumber = -1;
 
   int opt;
 
@@ -70,6 +70,7 @@ int main(int argc, char* argv[]){
       break;
     case 'e':
       endFileNumber = atoi(optarg);
+      break;
     case '?':
       if (optopt == 'd' || optopt == 'p' || optopt == 'o' || optopt == 'u')
 	fprintf(stderr, "Option -%c requires an argument. \n", optopt);
@@ -118,7 +119,7 @@ int main(int argc, char* argv[]){
     int startFile = 1;
     if (skipPreviousSkims) startFile = getStartFile(dataset.getName(),maxFiles);
     if (beginFileNumber > 0) startFile = beginFileNumber;
-    if (endFileNumber > 0) maxFiles = endFileNumber;
+    if (endFileNumber > 0 && endFileNumber + 1 < maxFiles) maxFiles = endFileNumber + 1;
 
     //    std::cout << startFile <<std::endl;
     // continue;
