@@ -131,14 +131,14 @@ void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::strin
 
   mcStack.Draw("");
 
-  mcStack.GetXaxis()->SetTitle(xAxisTitle.c_str());
+  if (mcStack.GetXaxis()) mcStack.GetXaxis()->SetTitle(xAxisTitle.c_str());
 
   if (xAxisLabels.size() > 0){
     for (unsigned int i = 1; i <= xAxisLabels.size(); i++){
-      mcStack.GetXaxis()->SetBinLabel(i,xAxisLabels[i-1].c_str());
+      if (mcStack.GetXaxis()) mcStack.GetXaxis()->SetBinLabel(i,xAxisLabels[i-1].c_str());
+      else if (plotMap.find("data") != plotMap.end()) plotMap["data"]->GetXaxis()->SetBinLabel(i,xAxisLabels[i-1].c_str());
     }
   }
-  
 
   setLabelThree(subLabel);
   //labelThree_->Draw();
@@ -149,6 +149,7 @@ void HistogramPlotter::makePlot(std::map<std::string, TH1F*> plotMap, std::strin
   if (plotMap.find("data") != plotMap.end()){
     max = TMath::Max(mcStack.GetMaximum(),plotMap["data"]->GetMaximum());
     plotMap["data"]->Draw("e x0, same");
+    plotMap["data"]->GetXaxis()->SetTitle(xAxisTitle.c_str());
   }
 
   mcStack.SetMaximum(max*1.3);

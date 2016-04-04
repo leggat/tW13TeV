@@ -45,6 +45,8 @@ class Cuts{
   float bTagCut_;
   unsigned int nBJets_;
 
+  float metCut_;
+
   //Skimming trees and execution position variable
   int skimStage_;
   TTree* skimTree_;

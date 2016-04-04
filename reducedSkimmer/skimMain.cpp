@@ -26,14 +26,11 @@ void show_usage(std::string name){
   std::cerr << "Usage: " << name << " <options(s)>"
 	    << "Options:\n"
  	    <<"\t-h,--help\tShow this message\n"
-	    << "\t-s\t--synch\tInitialise and use a synch cut flow.\n"
 	    << "\t-d\tDATASETCONF\tDataset config file\n"
-	    << "\t-m\tCUTSTAGE\tMake a skimmed tree at a defined point in the cuts.\n\t\t\t0 - Post lepton selection 1 - Post jet selection. 2 - Final event selecction I guess\n"
 	    << "\t-f\t\tOnly run over one file in each dataset. This is to speed up testing and so forth.\n"
-	    << "\t-p\tPLOTCONF\tPlot config file. Leave blank for no plots.\n"
-	    << "\t-o\tPLOTOUTDIR\tThe directory the plots will be written to. Defaults to plots/\n"
-	    << "\t-u\tCUTSTAGE\tRun the skimmer over previously made skims. Arguments are the same as for the making."
-	    << "\t-a\t\tSkip previously finished skims. This is because it keeps crashing for no obvious reason."
+	    << "\t-a\t\tSkip previously finished skims. This is because it keeps crashing for no obvious reason.\n"
+	    << "\t-b\tBEGIN\tThe file number to begin the skim on.\n"
+	    << "\t-e\tEND\tThe file number to stop skimming on.\n"
 	    << std::endl;
 }
 
@@ -48,9 +45,12 @@ int main(int argc, char* argv[]){
   int numSelMus = 2;
   int numSelEles = 0;
 
+  int beginFileNumber = -1;
+  int endFileNumber = -1.;
+
   int opt;
 
-  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:a"))!=-1){
+  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ab:e:"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -65,6 +65,11 @@ int main(int argc, char* argv[]){
     case 'a':
       skipPreviousSkims = true;
       break;
+    case 'b':
+      beginFileNumber = atoi(optarg);
+      break;
+    case 'e':
+      endFileNumber = atoi(optarg);
     case '?':
       if (optopt == 'd' || optopt == 'p' || optopt == 'o' || optopt == 'u')
 	fprintf(stderr, "Option -%c requires an argument. \n", optopt);
@@ -112,6 +117,8 @@ int main(int argc, char* argv[]){
 
     int startFile = 1;
     if (skipPreviousSkims) startFile = getStartFile(dataset.getName(),maxFiles);
+    if (beginFileNumber > 0) startFile = beginFileNumber;
+    if (endFileNumber > 0) maxFiles = endFileNumber;
 
     //    std::cout << startFile <<std::endl;
     // continue;

@@ -36,10 +36,12 @@ Cuts::Cuts():
   nJets_(1),
 
   //b-jet variables
-  //bTagCut_(0.935), //Tight cut
-  bTagCut_(0.800), //Medium cut
+  bTagCut_(0.935), //Tight cut
+  //bTagCut_(0.800), //Medium cut
 
   nBJets_(1),
+
+  metCut_(30.),
 
   skimStage_(-1),
   skimTree_(NULL),
@@ -313,6 +315,7 @@ std::vector<int> Cuts::getBJets(tWEvent* event){
 }
 
 //Placeholder for now. No cuts applied.
-bool Cuts::makeMETCuts(tWEvent*){
+bool Cuts::makeMETCuts(tWEvent* event){
+  if (event->Met_type1PF_pt < metCut_) return false;
   return true;
 }

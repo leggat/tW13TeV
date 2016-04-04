@@ -194,9 +194,11 @@ int main(int argc, char* argv[]){
       std::cout << " which contains " << dataset.getTotalEvents() << " events and a cross section of " << dataset.getCrossSection() << " giving a dataset weight of " << integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents() << std::endl;
       cutObj->setDatasetWeight(integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents());
     }
-    else cutObj->setDatasetWeight(1.);
+    else {
+      cutObj->setDatasetWeight(1.);
+      std::cout << " with is data" << std::endl;
+    }
     
-
     //The name should maybe be customisable?
     TChain * datasetChain = new TChain("TNT/BOOM");
 
@@ -211,7 +213,8 @@ int main(int argc, char* argv[]){
     else {
       delete datasetChain;
       datasetChain = new TChain("BOOM");
-      datasetChain->Add(("skims/"+dataset.getName()+"/skimTree*.root").c_str());
+      if (oneFileOnly) datasetChain->Add(("skims/"+dataset.getName()+"/skimTree1.root").c_str());
+      else datasetChain->Add(("skims/"+dataset.getName()+"/skimTree*.root").c_str());
     }
       // datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
 
@@ -237,7 +240,7 @@ int main(int argc, char* argv[]){
 
       int maxFiles = dataset.getnFiles();
       int upperFile = maxFiles;
-      if (skimToUse > -1 && startFile + 49 > maxFiles) upperFile = startFile+49;
+      if (skimToUse < 0 && startFile + 49 < maxFiles) upperFile = startFile+49;
       std::cout << std::endl << "Processing files " << startFile << "-" << upperFile << std::endl;
       for ( int evtInd = 0; evtInd < numberOfEntries; evtInd++){
 	if (evtInd % 5000 < 0.01) {
