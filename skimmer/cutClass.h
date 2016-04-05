@@ -36,6 +36,9 @@ class Cuts{
   float zMass_;
   float zMassWidth_;
 
+  //Low mass cut on dilepton
+  float lowMassCut_;
+
   //jet variables
   float jetPtCut_;
   float jetEtaCut_;

@@ -28,6 +28,7 @@ Cuts::Cuts():
 
   zMass_(91.),
   zMassWidth_(15.),
+  lowMassCut_(20.),
 
   //Initialise jet cuts here
   jetPtCut_(30.),
@@ -185,6 +186,8 @@ bool Cuts::makeLeptonCuts(tWEvent * event){
     event->lepton2.SetPtEtaPhiE(event->Muon_pt->at(event->muonIndexTight[1]),event->Muon_eta->at(event->muonIndexTight[1]),event->Muon_phi->at(event->muonIndexTight[1]),event->Muon_energy->at(event->muonIndexTight[1]));
     event->lepton2RelIso = event->Muon_relIsoDeltaBetaR04->at(1);
     if (fabs((event->lepton1 + event->lepton2).M() - zMass_) < zMassWidth_) return false;
+    //Low dilepton mass cut.
+    if ((event->lepton1 + event->lepton2).M() < lowMassCut_) return false;
   }
 
   if (doCutFlow_) {
