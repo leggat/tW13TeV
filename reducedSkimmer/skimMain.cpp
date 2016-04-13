@@ -12,12 +12,12 @@
 #include "config_parser.h"
 
 
-int getStartFile(std::string name,int nFilesMax){
+int getStartFile(std::string name, int startFile, int nFilesMax, std::string outdir){
   //
   struct stat buffer;
   int i = 0;
-  for (i = 1; i < nFilesMax; i++){
-    if (stat(("skims/"+name+"/skimTree"+std::to_string(i)+".root").c_str(), &buffer) != 0) break;
+  for (i = startFile; i < nFilesMax; i++){
+    if (stat((outdir+name+"/skimTree"+std::to_string(i)+".root").c_str(), &buffer) != 0) break;
   }
   return i;
 }
@@ -31,6 +31,8 @@ void show_usage(std::string name){
 	    << "\t-a\t\tSkip previously finished skims. This is because it keeps crashing for no obvious reason.\n"
 	    << "\t-b\tBEGIN\tThe file number to begin the skim on.\n"
 	    << "\t-e\tEND\tThe file number to stop skimming on.\n"
+	    << "\t-c\tCHANNEL\tThe channel to run over. For now 0 is dimuon and 1 is single muon. Will add more in as and when.\n"
+	    << "\t-o\tOUTFOLDER\tThe folder to put the skims into.\n"
 	    << std::endl;
 }
 
@@ -48,9 +50,13 @@ int main(int argc, char* argv[]){
   int beginFileNumber = -1;
   int endFileNumber = -1;
 
+  int channel = 0;
+
+  std::string outDirSkim = "skims/"; 
+
   int opt;
 
-  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ab:e:"))!=-1){
+  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ab:e:c:"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -71,6 +77,12 @@ int main(int argc, char* argv[]){
     case 'e':
       endFileNumber = atoi(optarg);
       break;
+    case 'c':
+      channel = atoi(optarg);
+      break;
+    case 'o':
+      outDirSkim = optarg;
+      break;
     case '?':
       if (optopt == 'd' || optopt == 'p' || optopt == 'o' || optopt == 'u')
 	fprintf(stderr, "Option -%c requires an argument. \n", optopt);
@@ -79,6 +91,22 @@ int main(int argc, char* argv[]){
       std::cerr << "Who knows" << std::endl;
       break;
     }
+  }
+
+  //Assign the number of selected leptons by the chosen channel no
+  switch (channel){
+  case 0:
+    numSelMus = 2;
+    numSelEles = 0;
+    break;
+  case 1:
+    numSelMus = 1;
+    numSelEles = 0;
+    break;
+  default:
+    std::cout << "Not an appropriate channel number!" << std::endl;
+    return 0;
+    break;
   }
 
   std::cout << "using config file: " << configFile <<std::endl;
@@ -106,7 +134,7 @@ int main(int argc, char* argv[]){
     //First update the cut flow table if we're doing that.
 
     int status;
-    status = mkdir(("skims/"+dataset.getName()).c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    status = mkdir((outDirSkim+dataset.getName()).c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     
     if (status == 100) std::cout << "wow.";
 
@@ -117,9 +145,11 @@ int main(int argc, char* argv[]){
     if (oneFileOnly) maxFiles = 2;
 
     int startFile = 1;
-    if (skipPreviousSkims) startFile = getStartFile(dataset.getName(),maxFiles);
     if (beginFileNumber > 0) startFile = beginFileNumber;
     if (endFileNumber > 0 && endFileNumber + 1 < maxFiles) maxFiles = endFileNumber + 1;
+    if (skipPreviousSkims) startFile = getStartFile(dataset.getName(),startFile,maxFiles,outDirSkim);
+
+    if (startFile > dataset.getnFiles() + 1) continue;
 
     //    std::cout << startFile <<std::endl;
     // continue;
@@ -174,12 +204,19 @@ int main(int argc, char* argv[]){
       }
       
       std::cout << std::endl << "A total of " << selectedEvents << " were skimmed." << std::endl;
-      std::cout << ("skims/"+dataset.getName() + "/skimTree"+std::to_string(fileInd)+".root").c_str() << std::endl;
-      TFile outFile(("skims/"+dataset.getName() + "/skimTree"+std::to_string(fileInd)+".root").c_str(),"RECREATE");
+      std::cout << (outDirSkim+dataset.getName() + "/skimTree"+std::to_string(fileInd)+".root").c_str() << std::endl;
+      TFile outFile((outDirSkim+dataset.getName() + "/skimTree"+std::to_string(fileInd)+".root").c_str(),"RECREATE");
       outFile.cd();
       cloneTree->Write();
       outFile.Write();
       outFile.Close();
+
+      //If we're only doing one file, make a prediction of how many events will be skimmed across the dataset.
+      if (oneFileOnly){
+	int expectedEvents = selectedEvents * dataset.getnFiles();
+	float datasetSF = (2300. * dataset.getCrossSection())/dataset.getTotalEvents();
+	std::cout << "Based on one file, we expect to grab " << expectedEvents << " events for " << dataset.getName() << " reweighted is " << datasetSF * expectedEvents << " events" << std::endl;
+      }
 
       delete cloneTree;
 
