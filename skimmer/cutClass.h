@@ -10,6 +10,9 @@ class Cuts{
 
   //Cut variables initialisation here
 
+  //Single lepton switch here
+  bool lepJets_;
+
   //Muon cut
   float muonPtCut_;
   float muonEtaCut_;
@@ -94,6 +97,10 @@ class Cuts{
 
   //Set up how many leptons to select here. this is so that the main program can set this.
   void setNTightMuon(int nmuons){nMuonsTight_ = nmuons;};
+  void setNTightEles(int neles){nEleTight_ = neles;};
+
+  //Also defining the number of jets to do here.
+  void setNJets(int njets){nJets_ = njets;};
     
   //For setting up the skimming
   void setSkimTree(int cutStage, TTree* cloneTree){skimStage_ = cutStage; skimTree_ = cloneTree;};

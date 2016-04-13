@@ -4,6 +4,7 @@
 
 Cuts::Cuts():
   //Do any initialisations here
+  lepJets_(false),
 
   //Initialise muon cuts
   muonPtCut_(20.),
@@ -37,12 +38,12 @@ Cuts::Cuts():
   nJets_(1),
 
   //b-jet variables
-  bTagCut_(0.935), //Tight cut
-  //bTagCut_(0.800), //Medium cut
+  //bTagCut_(0.935), //Tight cut
+  bTagCut_(0.800), //Medium cut
 
   nBJets_(1),
 
-  metCut_(30.),
+  metCut_(0.),
 
   skimStage_(-1),
   skimTree_(NULL),
@@ -188,6 +189,15 @@ bool Cuts::makeLeptonCuts(tWEvent * event){
     if (fabs((event->lepton1 + event->lepton2).M() - zMass_) < zMassWidth_) return false;
     //Low dilepton mass cut.
     if ((event->lepton1 + event->lepton2).M() < lowMassCut_) return false;
+  }
+
+  //Do single lepton specific cuts here
+  if (nMuonsTight_ + nEleTight_ == 1){
+    //If single muon channel, make the lepton be a muon.
+    if (nMuonsTight_ > 0){
+      event->lepton1.SetPtEtaPhiE(event->Muon_pt->at(event->muonIndexTight[0]),event->Muon_eta->at(event->muonIndexTight[0]),event->Muon_phi->at(event->muonIndexTight[0]),event->Muon_energy->at(event->muonIndexTight[0]));
+      event->lepton1RelIso = event->Muon_relIsoDeltaBetaR04->at(0);
+    }
   }
 
   if (doCutFlow_) {
