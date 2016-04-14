@@ -155,10 +155,13 @@ int main(int argc, char* argv[]){
     // continue;
 
     for (int fileInd = startFile; fileInd < maxFiles; fileInd++){
-      std::cout << "Doing file " << fileInd << " of " << maxFiles - 1;
       
 
       datasetChain->Reset();
+      struct stat buffer;
+      if (stat((dataset.getFolderName()+"OutTree_"+std::to_string(fileInd)+".root").c_str(), &buffer) != 0) continue;
+      std::cout << "Doing file " << fileInd << " of " << maxFiles - 1;
+
       datasetChain->Add((dataset.getFolderName()+"OutTree_"+std::to_string(fileInd)+".root").c_str());
       
       tWEvent * event = new tWEvent(datasetChain);
