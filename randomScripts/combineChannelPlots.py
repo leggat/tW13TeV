@@ -3,12 +3,22 @@ from ROOT import *
 
 from setTDRStyle import setTDRStyle
 
+import sys
+
 gROOT.SetBatch()
 
 plots = ["dileptonMass","lep1Pt","lep1Eta","lep1Phi","lep1RelIso","lep2Pt","lep2Eta","lep2Phi","lep2RelIso","nJets","jet1Pt","jet1Eta", "jet1Tag","nBJets","met","metPx","metPy","metPz","metPhi"]
 stages = ["lepSel","jetSel","bTag","fullSel"]
 #plots = ["lep1Pt"]
 #stages = ["lepSel"]
+
+inDir = "plots/"
+outDir = "plots/combined/"
+
+if len(sys.argv) > 1:
+    outDir = sys.argv[1]
+
+histSFs = {"zPlusJets":2.,"zLowMass":0.67}
 
 gStyle.SetOptTitle(0)
 gStyle.SetPalette(1)
@@ -48,12 +58,12 @@ text2.SetTextSize(0.0610687)
 for plot in plots:
     for stage in stages:
         print plot+stage
-        in1 = TFile("plots/noZJets/"+plot+stage+".root","READ")
-        in3 = TFile("plots/zPlusJets/"+plot+stage+".root","READ")
-        in4 = TFile("plots/zLowMass/"+plot+stage+".root","READ")
-        in2 = TFile("plots/ttbar/"+plot+stage+".root","READ")
-        datFile = TFile("plots/diMuon/"+plot+stage+".root","READ")
-        outFile = TFile("plots/combined/"+plot+stage+".root","RECREATE")
+        in1 = TFile(inDir+"noZPlusJets/"+plot+stage+".root","READ")
+        in3 = TFile(inDir+"zPlusJets/"+plot+stage+".root","READ")
+        in4 = TFile(inDir+"zLowMass/"+plot+stage+".root","READ")
+        in2 = TFile(inDir+"ttbar/"+plot+stage+".root","READ")
+        datFile = TFile(inDir+"diMuon/"+plot+stage+".root","READ")
+        outFile = TFile(outDir+plot+stage+".root","RECREATE")
         outStack = 0
         outStack = THStack(plot+stage,plot+stage)
         
@@ -66,6 +76,7 @@ for plot in plots:
                     if xAxisTitle == "":
                         xAxisTitle = prim.GetXaxis().GetTitle()
                     for hist in prim.GetHists():
+                        hist.Scale(2.3/2.5)
                         outStack.Add(hist)
 
             fileN.Close()
@@ -99,7 +110,12 @@ for plot in plots:
         sumHistMC = 0.
         sumHistMC = TH1F(outStack.GetHistogram().Clone(plot+stage+"totMC"))
         for stackHist in outStack.GetHists():
-            leggy.AddEntry(stackHist,stackHist.GetName().split("_")[0].split(plot)[1],"f")
+            dSet = stackHist.GetName().split("_")[0].split(plot)[1]
+#            if dSet in histSFs:
+#                stackHist.Scale(histSFs)
+#            stackHist.Scale(2.3/2.5)
+            leggy.AddEntry(stackHist,dSet,"f")
+            sys.stdout.flush()
             sumHistMC.Add(stackHist)
 
         datHist.Draw("epsame")
@@ -131,6 +147,9 @@ for plot in plots:
         sumData = datHist.Clone(plot+stage+"ratio")
 #        SetOwnership(sumData,True)
         sumData.Divide(sumHistMC)
+        for bin in range(1,sumData.GetNbinsX()+1):
+            if sumHistMC.GetBinContent(bin) > 0:
+                sumData.SetBinError(bin,((datHist.GetBinError(bin)+datHist.GetBinContent(bin))/sumHistMC.GetBinContent(bin) - sumData.GetBinContent(bin)))
 
         sumData.SetMinimum(0.0)
         sumData.SetMaximum(2.0)
@@ -141,11 +160,11 @@ for plot in plots:
 
         sumData.Draw("E1X0")
 
-        outCanvas.SaveAs("plots/combined/"+plot+stage+".png")
+        outCanvas.SaveAs(outDir+plot+stage+".png")
         outCanvas.Write()
 
         outCanvas.SetLogy()
-        outCanvas.SaveAs("plots/combined/"+plot+stage+"_log.png")
+        outCanvas.SaveAs(outDir+plot+stage+"_log.png")
 
         datFile.Close()
 
