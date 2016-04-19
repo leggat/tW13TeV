@@ -49,6 +49,9 @@ void show_usage(std::string name){
 	    << "\t-o\tPLOTOUTDIR\tThe directory the plots will be written to. Defaults to plots/\n"
 	    << "\t-u\tCUTSTAGE\tRun the skimmer over previously made skims. Arguments are the same as for the making."
 	    << "\t-a\t\tSkip previously finished skims. This is because it keeps crashing for no obvious reason."
+	    << "\t-c\tCHANNEL\tThe channel to be run over. 0 (default) is di-muon, 1 is single muon. Others to come probably.\n"
+	    << "\t-b\tBEGINFILE\tThe file to begin running on. Useful for parallelising processing.\n"
+	    << "\t-e\tENDFILE\tThe file to end on. Defaults to nFiles if larger than the number of files.\n"
 	    << std::endl;
 }
 
@@ -63,6 +66,13 @@ int main(int argc, char* argv[]){
   char * plotConf = NULL;
   bool skipPreviousSkims = false;
   const char * plotOutDir = "plots/";
+  int channel = 0;
+
+  int beginFileNumber = -1;
+  int endFileNumber = -1;
+
+  std::string skimFolder = "";
+
 
   //The integrated luminosity of the data being used. 
   //At some point this should become a sum of lumis of the data being used, but for now it is hard-coded because I'm not looking at data yet. Or something.
@@ -84,7 +94,7 @@ int main(int argc, char* argv[]){
      "B tags          ",
      "MET             "}; 
 
-  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:a"))!=-1){
+  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ac:b:e:"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -114,8 +124,17 @@ int main(int argc, char* argv[]){
     case 'a':
       skipPreviousSkims = true;
       break;
+    case 'c':
+      channel = atoi(optarg);
+      break;
+    case 'b':
+      beginFileNumber = atoi(optarg);
+      break;
+    case 'e':
+      endFileNumber = atoi(optarg);
+      break;
     case '?':
-      if (optopt == 'd' || optopt == 'p' || optopt == 'o' || optopt == 'u')
+      if (optopt == 'd' || optopt == 'p' || optopt == 'o' || optopt == 'u' || optopt == 'c' || optopt == 'b' || optopt == 'e')
 	fprintf(stderr, "Option -%c requires an argument. \n", optopt);
       return 0;
     default:
@@ -147,13 +166,36 @@ int main(int argc, char* argv[]){
   //Set up the cut class
   Cuts * cutObj = new Cuts();
 
+  //Change stuff in the cut class depending on what channel we're doing
+  switch (channel){
+  case 0:
+    cutObj->setNTightMuon(2);
+    cutObj->setNTightEles(0);
+    cutObj->setNJets(1);
+    cutObj->setNBJets(1);
+    cutObj->isLepJets(false);    
+    skimFolder = "skims/";
+    break;
+  case 1:
+    cutObj->setNTightMuon(1);
+    cutObj->setNTightEles(0);
+    cutObj->setNJets(3);
+    cutObj->setNBJets(1);
+    cutObj->isLepJets(true);
+    skimFolder = "skims/singMuon/"; //Hopefully it won't later be annoying that I made these hardcoded.
+    break;
+  default:
+    std::cout << "This is not an acceptable channel! Sort your life out!" << std::endl;
+    return 0;
+  }
+
   //Some stuff for synchronsation will go in here.
   std::map<std::string,TH1F*> cutFlow;
   //TH1F* cutFlow = NULL;
   if (makeCutFlow){
     for (auto const & dataset : *datasets){
-      if (cutFlow.find(dataset.getLegName()) == cutFlow.end()){
-	cutFlow[dataset.getLegName()] = new TH1F(("cutFlowTable"+dataset.getLegName()).c_str(),("cutFlowTable"+dataset.getLegName()).c_str(),cutFlowStringList.size(),0,cutFlowStringList.size());
+      if (cutFlow.find(dataset.getName()) == cutFlow.end()){
+	cutFlow[dataset.getName()] = new TH1F(("cutFlowTable"+dataset.getName()).c_str(),("cutFlowTable"+dataset.getName()).c_str(),cutFlowStringList.size(),0,cutFlowStringList.size());
       }
     }
   }
@@ -164,14 +206,14 @@ int main(int argc, char* argv[]){
   std::map<std::string,datasetInfo> datasetInfos;
   if (plotConf){
     for (auto const & dataset: *datasets){
-      if (plotMap.find(dataset.getLegName()) ==  plotMap.end()){
-	datasetInfos[dataset.getLegName()] = datasetInfo();
-	datasetInfos[dataset.getLegName()].colour = dataset.getColour();
-	datasetInfos[dataset.getLegName()].legLabel = dataset.getLegName();
-	datasetInfos[dataset.getLegName()].legType = 'f';
-	plotMap[dataset.getLegName()] = std::map<std::string,Plots*> ();
+      if (plotMap.find(dataset.getName()) ==  plotMap.end()){
+	datasetInfos[dataset.getName()] = datasetInfo();
+	datasetInfos[dataset.getName()].colour = dataset.getColour();
+	datasetInfos[dataset.getName()].legLabel = dataset.getLegName();
+	datasetInfos[dataset.getName()].legType = 'f';
+	plotMap[dataset.getName()] = std::map<std::string,Plots*> ();
 	for (auto const & stageName : cutStageNameVec){
-	  plotMap[dataset.getLegName()][stageName] = new Plots(plotConf,dataset.getLegName()+"_"+stageName);
+	  plotMap[dataset.getName()][stageName] = new Plots(plotConf,dataset.getName()+"_"+stageName);
 	}
       }
     }
@@ -184,10 +226,10 @@ int main(int argc, char* argv[]){
     std::cout << "Processing dataset " << dataset.getName();
     //Do some initialisations of stuff on a per-database basis here.
     //First update the cut flow table if we're doing that.
-    if (makeCutFlow) cutObj->setCutFlowHistogram(cutFlow[dataset.getLegName()]);
+    if (makeCutFlow) cutObj->setCutFlowHistogram(cutFlow[dataset.getName()]);
     
     //Next set up the plots that we want to fill if we're making plots.
-    if (plotConf) cutObj->setPlots(plotMap[dataset.getLegName()]);
+    if (plotConf) cutObj->setPlots(plotMap[dataset.getName()]);
 
     //Next update the datasetweight in cut obj (this is important for filling histograms and the like).
     if (dataset.isMC()){
@@ -196,7 +238,7 @@ int main(int argc, char* argv[]){
     }
     else {
       cutObj->setDatasetWeight(1.);
-      std::cout << " with is data" << std::endl;
+      std::cout << " which is data" << std::endl;
     }
     
     //The name should maybe be customisable?
@@ -213,8 +255,8 @@ int main(int argc, char* argv[]){
     else {
       delete datasetChain;
       datasetChain = new TChain("BOOM");
-      if (oneFileOnly) datasetChain->Add(("skims/"+dataset.getName()+"/skimTree1.root").c_str());
-      else datasetChain->Add(("skims/"+dataset.getName()+"/skimTree*.root").c_str());
+      if (oneFileOnly) datasetChain->Add((skimFolder+dataset.getName()+"/skimTree1.root").c_str());
+      else datasetChain->Add((skimFolder+dataset.getName()+"/skimTree*.root").c_str());
     }
       // datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
 
@@ -231,9 +273,12 @@ int main(int argc, char* argv[]){
     //This variable is used for saving the tree part way through production if the number of selected events exceeds a certain amount.
     int nSkimFiles = (startFile - 1) / 50.;
 
-
     //Begin loop over all events
     int numberSelected = 0;
+
+    //This is now how this is going down. Firstly we work out how many files we're adding.
+    //    if (beginFileNumber > 0) 
+
     do{
       int numberOfEntries = datasetChain->GetEntries();
       std::cout << "Tree to be processed contains " << numberOfEntries << " entries." << std::endl;
@@ -294,10 +339,26 @@ int main(int argc, char* argv[]){
 
     if (makeCutFlow){
       std::cout << "Cut flow for " << dataset.getName() << std::endl;
-      for (int cfInd = 1; cfInd < cutFlow[dataset.getLegName()]->GetXaxis()->GetNbins()+1; cfInd++){
-	std::cout << cutFlowStringList[cfInd-1] << " : " << cutFlow[dataset.getLegName()]->GetBinContent(cfInd) << std::endl;
+      for (int cfInd = 1; cfInd < cutFlow[dataset.getName()]->GetXaxis()->GetNbins()+1; cfInd++){
+	std::cout << cutFlowStringList[cfInd-1] << " : " << cutFlow[dataset.getName()]->GetBinContent(cfInd) << std::endl;
+	TFile * cutFlowFile = new TFile((plotOutDir + dataset.getName() + "+cutFlow"+std::to_string(startFile) + ".root").c_str(),"RECREATE");
+	cutFlowFile->cd();
+	cutFlow[dataset.getName()]->Write();
+	cutFlowFile->Write();
+	cutFlowFile->Close();
+	delete cutFlowFile;
       }
       
+    }
+    //output the generated historgrams into a single root file per dataset for later combination.
+    if (plotConf){
+      TFile * tempFile = new TFile((plotOutDir + dataset.getName() + "_plots" + std::to_string(startFile) + ".root").c_str(),"RECREATE");
+      for (auto const & stageName : cutStageNameVec){
+	plotMap[dataset.getName()][stageName]->saveHists(tempFile);
+      }
+      tempFile->Write();
+      tempFile->Close();
+      delete tempFile;
     }
 
   } // Close dataset loop

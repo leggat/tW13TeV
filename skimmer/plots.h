@@ -18,6 +18,7 @@ class Plots{
   ~Plots();
   void fillAllPlots(tWEvent*,float,int);
   std::vector<plot> getPlotsVec(){return plotsVec;};
+  void saveHists(TFile *);
 };
 
 struct plot{

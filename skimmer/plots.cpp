@@ -35,7 +35,7 @@ Plots::Plots(std::string confName, std::string postfix ){
     plotsVec.push_back(plot());
     plotsVec[i].name = name;
     plotsVec[i].xAxisLabel = xAxisLabel;
-    plotsVec[i].hist = new TH1F((plotsVec[i].name + postfix).c_str(), (plotsVec[i].name + postfix).c_str(), nBinsT,xMinT,xMaxT);
+    plotsVec[i].hist = new TH1F((plotsVec[i].name +"_" + postfix).c_str(), (plotsVec[i].name +"_" + postfix).c_str(), nBinsT,xMinT,xMaxT);
   }
 
 }//End constructor
@@ -85,6 +85,24 @@ void Plots::fillAllPlots(tWEvent* event, float weight, int cutStage){
     if (plotsVec[i].name == "jet1Tag" && cutStage > 0 && event->jetIndex.size() > 0){
       plotsVec[i].hist->Fill(event->Jet_pfCombinedInclusiveSecondaryVertexV2BJetTags->at(event->jetIndex[0]),weight);
     }
+    if (plotsVec[i].name == "jet2Pt" && cutStage > 0 && event->jetIndex.size() > 0){
+      plotsVec[i].hist->Fill(event->Jet_pt->at(event->jetIndex[1]),weight);
+    }
+    if (plotsVec[i].name == "jet2Eta" && cutStage > 0 && event->jetIndex.size() > 0){
+      plotsVec[i].hist->Fill(event->Jet_eta->at(event->jetIndex[1]),weight);
+    }
+    if (plotsVec[i].name == "jet2Tag" && cutStage > 0 && event->jetIndex.size() > 0){
+      plotsVec[i].hist->Fill(event->Jet_pfCombinedInclusiveSecondaryVertexV2BJetTags->at(event->jetIndex[1]),weight);
+    }
+    if (plotsVec[i].name == "jet3Pt" && cutStage > 0 && event->jetIndex.size() > 0){
+      plotsVec[i].hist->Fill(event->Jet_pt->at(event->jetIndex[2]),weight);
+    }
+    if (plotsVec[i].name == "jet3Eta" && cutStage > 0 && event->jetIndex.size() > 0){
+      plotsVec[i].hist->Fill(event->Jet_eta->at(event->jetIndex[2]),weight);
+    }
+    if (plotsVec[i].name == "jet3Tag" && cutStage > 0 && event->jetIndex.size() > 0){
+      plotsVec[i].hist->Fill(event->Jet_pfCombinedInclusiveSecondaryVertexV2BJetTags->at(event->jetIndex[2]),weight);
+    }
     if (plotsVec[i].name == "nBJets" && cutStage > 1){
       plotsVec[i].hist->Fill(event->bTagIndex.size(),weight);
     }
@@ -106,5 +124,14 @@ void Plots::fillAllPlots(tWEvent* event, float weight, int cutStage){
     if (plotsVec[i].name == "dileptonMass"){
       plotsVec[i].hist->Fill((event->lepton1+event->lepton2).M(),weight);
     }
+  }
+}
+
+
+//Put all of the plots we've generated into a single file.
+void Plots::saveHists(TFile * saveFile){
+  saveFile->cd();
+  for (unsigned int i = 0; i < plotsVec.size(); i++){
+    plotsVec[i].hist->Write();
   }
 }
