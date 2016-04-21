@@ -101,6 +101,10 @@ class Cuts{
 
   //Also defining the number of jets to do here.
   void setNJets(int njets){nJets_ = njets;};
+  void setNBJets(int nbjets){nBJets_ = nbjets;};
+
+  //To say whether the event is lepton plus jets
+  void isLepJets(bool islepjets){lepJets_ = islepjets;};
     
   //For setting up the skimming
   void setSkimTree(int cutStage, TTree* cloneTree){skimStage_ = cutStage; skimTree_ = cloneTree;};
@@ -108,5 +112,8 @@ class Cuts{
 
   //Setting the dataset weight
   void setDatasetWeight(float weight){datasetWeight_ = weight;};
+
+  //Change the channel that we're using.
+  void setCutChannel(int channel);
 
 };

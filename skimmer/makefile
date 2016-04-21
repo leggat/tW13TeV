@@ -1,7 +1,7 @@
 #Setting up the relevant flags
 
 CC = g++
-CFLAGS = -g -Wall -std=c++0x $(shell root-config --cflags) -I/afs/ihep.ac.cn/users/d/duncanleg/bin/include
+CFLAGS = -g -Wall -std=c++0x -pthread $(shell root-config --cflags) -I/afs/ihep.ac.cn/users/d/duncanleg/bin/include
 LIBS = $(shell root-config --libs) -L/afs/ihep.ac.cn/users/d/duncanleg/bin/lib -lconfig++
 ROOTSYS = /cvmfs/cms.cern.ch/slc6_amd64_gcc481/lcg/root/5.34.18-cms2/
 

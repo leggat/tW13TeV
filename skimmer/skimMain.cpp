@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <cmath>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "tWEvent.h"
@@ -15,7 +16,210 @@
 #include "plots.h"
 #include "TH1.h"
 #include <sys/stat.h>
+#include <thread>
+#include "TThread.h"
+#include <mutex>
 
+std::mutex mu;
+
+//Define a load of global variables here.
+typedef struct threadArg threadArg;
+
+struct threadArg{
+  int threadId;
+  Dataset dataset;
+};
+
+static const std::vector<std::string> cutStageNameVec = {"lepSel","jetSel","bTag","fullSel"};
+bool makeCutFlow = false;
+const std::vector<std::string> cutFlowStringList = 
+  {"nEvents         ",
+   "Trigger         ",
+   "PV              ",
+   "Tight muons     ",
+   "Loose muon veto ",
+   "Electron veto   ",
+   "Charge selection",
+   "Lepton mass     ",
+   "Jets            ",
+   "B tags          ",
+   "MET             "}; 
+std::string skimFolder = "";
+bool oneFileOnly = false;
+const char * plotOutDir = "plots/";
+bool skipPreviousSkims = false;
+bool skipPreviousPlots = false;
+std::string skimOutDir = "skims/";
+char * plotConf = NULL;
+int skimToUse = -1;
+float integratedLuminosity = 2300.;
+
+int channel = 0;
+
+int cutStage = -1;
+
+bool addFilesToChain(TChain * chain, std::string folderName, std::string fileName, int startFile, int nFiles){
+  chain->Reset();
+  int j = 0;
+  for (int i = startFile; i <= startFile+99; i++){
+    if (i > nFiles) break;
+    //By checking the stat of the file we make sure that we don't include files that don't actually exist.
+    struct stat buffer;
+    //    std::cout << folderName+fileName+std::to_string(i)+".root" << std::endl;
+    if (stat((folderName+fileName+std::to_string(i)+".root").c_str(), &buffer) != 0) continue;
+    chain->Add((folderName+fileName+std::to_string(i)+".root").c_str());
+    j++;
+  }
+  std::cout << "Added " << j << " files to the chain" << std::endl;
+  return true;
+}
+
+//It seems that I'm vastly changing the theme of this script, and now it's a multithreaded plot making script.
+//actually scrap that. This is a multithreaded selection. It can still make the small skims in here, or make plots
+//if that's what we're doing. I may change the input method for this script though. Or maybe not, who knows.
+void threadedSelection(void * ptr){
+
+  TThread thread;
+  thread.Initialize(); 
+
+  threadArg* args = (threadArg*) ptr;
+  
+  Dataset dataset = args->dataset;
+
+  int threadID = args->threadId;
+
+  TChain * datasetChain;
+  
+  //Before we start running this, check whether we can skim things and not do it.
+  if (skipPreviousSkims && cutStage > -1){
+    struct stat buffer;
+    if (stat((skimOutDir + dataset.getName()+cutStageNameVec[cutStage]+std::to_string(threadID) + ".root").c_str(), &buffer) == 0) return;
+  }
+  if (skipPreviousPlots && plotConf){
+    struct stat buffer;
+    std::cout << (plotOutDir + dataset.getName() + "_plots" + std::to_string(threadID) + ".root") << std::endl;
+    if (stat((plotOutDir + dataset.getName() + "_plots" + std::to_string(threadID) + ".root").c_str(), & buffer) == 0) return;
+  }
+
+  Cuts * cutObj = new Cuts();
+
+  cutObj->setCutChannel(channel);
+
+  int startFile = threadID * 100 + 1;
+
+  mu.lock();
+  if (skimToUse < 0){
+    datasetChain = new TChain("TNT/BOOM");
+    if (oneFileOnly) datasetChain->Add((dataset.getFolderName()+"OutTree_"+std::to_string(startFile)+".root").c_str());
+    else addFilesToChain(datasetChain,dataset.getFolderName(),"OutTree_",startFile,dataset.getnFiles());
+  }
+  else { 
+    datasetChain = new TChain("BOOM");
+    if (oneFileOnly) datasetChain->Add((skimFolder+dataset.getName()+"/skimTree"+std::to_string(startFile)+".root").c_str());
+    else addFilesToChain(datasetChain,skimFolder+dataset.getName(),"/skimTree",startFile,dataset.getnFiles());
+  }
+
+  std::map<std::string,Plots*> datasetPlots;
+  TH1F* cutFlow = NULL;
+
+  if (makeCutFlow){
+    cutFlow = new TH1F(("cutFlowTable"+dataset.getName()+std::to_string(threadID)).c_str(),("cutFlowTable"+dataset.getName()+std::to_string(threadID)).c_str(),cutFlowStringList.size(),0,cutFlowStringList.size());
+    cutObj->setCutFlowHistogram(cutFlow);
+  }
+
+  if (plotConf){
+    for (auto const & stageName : cutStageNameVec){
+      datasetPlots[stageName] = new Plots(plotConf,dataset.getName()+"_"+stageName + std::to_string(threadID));
+    }
+    cutObj->setPlots(datasetPlots);
+  }
+
+
+  //If we're doing skimming, make the clone tree here
+  TTree * cloneTree;
+  if (cutStage > -1){
+    cloneTree = datasetChain->CloneTree(0);
+    cutObj->setSkimTree(cutStage,cloneTree);
+  }
+
+  //Make the event object
+  tWEvent * event = new tWEvent(datasetChain);
+
+  mu.unlock();
+
+  //Next update the datasetweight in cut obj (this is important for filling histograms and the like).
+  if (dataset.isMC()){
+    std::cout << " which contains " << dataset.getTotalEvents() << " events and a cross section of " << dataset.getCrossSection() << " giving a dataset weight of " << integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents() << std::endl;
+    cutObj->setDatasetWeight(integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents());
+    }
+  else {
+    cutObj->setDatasetWeight(1.);
+    std::cout << " which is data" << std::endl;
+  }
+
+  std::cout << "number of entries";
+  int numberOfEntries = datasetChain->GetEntries();
+
+  std::cout << numberOfEntries <<std::endl;
+
+  int numberSelected = 0;
+
+  //Loop over all the events in the chain
+  for (int evtInd = 0; evtInd < numberOfEntries; evtInd++){
+    if (evtInd % 5000 < 0.01) {
+      if (cutStage > -1) std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " and number in clone tree: " << cloneTree->GetEntries() << " \r";
+      else  std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " \r";
+      std::cout.flush();
+    }
+    
+    event->GetEntry(evtInd);
+
+    //Make the cuts!
+    if (!cutObj->makeCuts(event)) continue;
+    numberSelected++;
+  }//end event loop
+
+  mu.lock();
+
+
+  //Save and delete all the things at the end of the thread.
+  if (cutStage > -1){
+    TFile cloneFile((skimOutDir + dataset.getName()+cutStageNameVec[cutStage]+std::to_string(threadID) + ".root").c_str(),"RECREATE");
+    cloneFile.cd();
+    cloneTree->Write();
+    cloneFile.Write();
+    cloneFile.Close();
+    delete cloneTree;
+  }
+
+  if (makeCutFlow){
+    TFile * cutFlowFile = new TFile((plotOutDir + dataset.getName() + "_cutFlow"+std::to_string(threadID) + ".root").c_str(),"RECREATE");
+    cutFlowFile->cd();
+    cutFlow->Write();
+    cutFlowFile->Write();
+    cutFlowFile->Close();
+    delete cutFlowFile;
+    delete cutFlow;
+  }
+
+  if (plotConf){
+    TFile * tempFile = new TFile((plotOutDir + dataset.getName() + "_plots" + std::to_string(threadID) + ".root").c_str(),"RECREATE");
+    for (auto const & stageName : cutStageNameVec){
+      datasetPlots[stageName]->saveHists(tempFile);
+      delete datasetPlots[stageName];
+    }
+    tempFile->Write();
+    tempFile->Close();
+    delete tempFile;
+  }
+
+
+  delete cutObj;
+  delete event;
+  delete datasetChain;
+  mu.unlock();
+}
+		   
 
 int getStartFile(std::string name,std::string stage){
   //
@@ -25,16 +229,6 @@ int getStartFile(std::string name,std::string stage){
     if (stat(("skims/"+name+stage+std::to_string(i)+".root").c_str(), &buffer) != 0) break;
   }
   return i * 50 + 1;
-}
-
-bool addFilesToChain(TChain * chain, std::string folderName, int startFile, int nFiles){
-  chain->Reset();
-  for (int i = startFile; i <= startFile+49; i++){
-    if (i > nFiles) break;
-    chain->Add((folderName+"OutTree_"+std::to_string(i)+".root").c_str());
-    
-  }
-  return true;
 }
 
 void show_usage(std::string name){
@@ -52,49 +246,21 @@ void show_usage(std::string name){
 	    << "\t-c\tCHANNEL\tThe channel to be run over. 0 (default) is di-muon, 1 is single muon. Others to come probably.\n"
 	    << "\t-b\tBEGINFILE\tThe file to begin running on. Useful for parallelising processing.\n"
 	    << "\t-e\tENDFILE\tThe file to end on. Defaults to nFiles if larger than the number of files.\n"
+	    << "\t-y\t\tSkips a thread if the plot file has already been created. This is, again, to deal with the random termination problems I've been encountering.\n"
 	    << std::endl;
 }
 
 int main(int argc, char* argv[]){
 
+
   //Parse command line arguments here!
   int opt;
-  int cutStage = -1;
-  int skimToUse = -1;
-  std::vector<std::string> cutStageNameVec = {"lepSel","jetSel","bTag","fullSel"};
-  char * configFile = NULL;
-  char * plotConf = NULL;
-  bool skipPreviousSkims = false;
-  const char * plotOutDir = "plots/";
-  int channel = 0;
-
-  int beginFileNumber = -1;
-  int endFileNumber = -1;
-
-  std::string skimFolder = "";
-
+    char * configFile = NULL;
 
   //The integrated luminosity of the data being used. 
   //At some point this should become a sum of lumis of the data being used, but for now it is hard-coded because I'm not looking at data yet. Or something.
-  float integratedLuminosity = 2500;
 
-  bool oneFileOnly = false;
-
-  bool makeCutFlow = false;
-  std::vector<std::string> cutFlowStringList = 
-    {"nEvents         ",
-     "Trigger         ",
-     "PV              ",
-     "Tight muons     ",
-     "Loose muon veto ",
-     "Electron veto   ",
-     "Charge selection",
-     "Lepton mass     ",
-     "Jets            ",
-     "B tags          ",
-     "MET             "}; 
-
-  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ac:b:e:"))!=-1){
+  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ac:y"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -127,11 +293,8 @@ int main(int argc, char* argv[]){
     case 'c':
       channel = atoi(optarg);
       break;
-    case 'b':
-      beginFileNumber = atoi(optarg);
-      break;
-    case 'e':
-      endFileNumber = atoi(optarg);
+    case 'y':
+      skipPreviousPlots = true;
       break;
     case '?':
       if (optopt == 'd' || optopt == 'p' || optopt == 'o' || optopt == 'u' || optopt == 'c' || optopt == 'b' || optopt == 'e')
@@ -163,25 +326,12 @@ int main(int argc, char* argv[]){
     return 0.;
   }
 
-  //Set up the cut class
-  Cuts * cutObj = new Cuts();
-
   //Change stuff in the cut class depending on what channel we're doing
   switch (channel){
   case 0:
-    cutObj->setNTightMuon(2);
-    cutObj->setNTightEles(0);
-    cutObj->setNJets(1);
-    cutObj->setNBJets(1);
-    cutObj->isLepJets(false);    
     skimFolder = "skims/";
     break;
   case 1:
-    cutObj->setNTightMuon(1);
-    cutObj->setNTightEles(0);
-    cutObj->setNJets(3);
-    cutObj->setNBJets(1);
-    cutObj->isLepJets(true);
     skimFolder = "skims/singMuon/"; //Hopefully it won't later be annoying that I made these hardcoded.
     break;
   default:
@@ -189,33 +339,16 @@ int main(int argc, char* argv[]){
     return 0;
   }
 
-  //Some stuff for synchronsation will go in here.
-  std::map<std::string,TH1F*> cutFlow;
-  //TH1F* cutFlow = NULL;
-  if (makeCutFlow){
-    for (auto const & dataset : *datasets){
-      if (cutFlow.find(dataset.getName()) == cutFlow.end()){
-	cutFlow[dataset.getName()] = new TH1F(("cutFlowTable"+dataset.getName()).c_str(),("cutFlowTable"+dataset.getName()).c_str(),cutFlowStringList.size(),0,cutFlowStringList.size());
-      }
-    }
-  }
-
+ 
   //Make the histograms here. It is important to do this before the main dataset loop because some datasets fill the same histrograms (i.e. single top etc).
   //When I end up running over multiple channels or systematics, this will likely need to be expanded.
-  std::map<std::string,std::map<std::string,Plots*> > plotMap;
   std::map<std::string,datasetInfo> datasetInfos;
   if (plotConf){
     for (auto const & dataset: *datasets){
-      if (plotMap.find(dataset.getName()) ==  plotMap.end()){
-	datasetInfos[dataset.getName()] = datasetInfo();
-	datasetInfos[dataset.getName()].colour = dataset.getColour();
-	datasetInfos[dataset.getName()].legLabel = dataset.getLegName();
-	datasetInfos[dataset.getName()].legType = 'f';
-	plotMap[dataset.getName()] = std::map<std::string,Plots*> ();
-	for (auto const & stageName : cutStageNameVec){
-	  plotMap[dataset.getName()][stageName] = new Plots(plotConf,dataset.getName()+"_"+stageName);
-	}
-      }
+      datasetInfos[dataset.getName()] = datasetInfo();
+      datasetInfos[dataset.getName()].colour = dataset.getColour();
+      datasetInfos[dataset.getName()].legLabel = dataset.getLegName();
+      datasetInfos[dataset.getName()].legType = 'f';
     }
   }
 
@@ -224,145 +357,52 @@ int main(int argc, char* argv[]){
   for (auto const & dataset : *datasets){
 
     std::cout << "Processing dataset " << dataset.getName();
-    //Do some initialisations of stuff on a per-database basis here.
-    //First update the cut flow table if we're doing that.
-    if (makeCutFlow) cutObj->setCutFlowHistogram(cutFlow[dataset.getName()]);
+    //Do some initialisations of stuff on a per-dataset basis here.
     
-    //Next set up the plots that we want to fill if we're making plots.
-    if (plotConf) cutObj->setPlots(plotMap[dataset.getName()]);
+    //calculated how many threads we're going to run.
+    int nThreads = std::ceil(dataset.getnFiles() / 100.);
 
-    //Next update the datasetweight in cut obj (this is important for filling histograms and the like).
-    if (dataset.isMC()){
-      std::cout << " which contains " << dataset.getTotalEvents() << " events and a cross section of " << dataset.getCrossSection() << " giving a dataset weight of " << integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents() << std::endl;
-      cutObj->setDatasetWeight(integratedLuminosity * dataset.getCrossSection()/dataset.getTotalEvents());
-    }
-    else {
-      cutObj->setDatasetWeight(1.);
-      std::cout << " which is data" << std::endl;
-    }
-    
-    //The name should maybe be customisable?
-    TChain * datasetChain = new TChain("TNT/BOOM");
+    //    TThread* t[nThreads];
+    std::thread t[nThreads];
 
-    int startFile = 1;
-    if (skipPreviousSkims) startFile = getStartFile(dataset.getName(),cutStageNameVec[cutStage]);
+    std::cout << nThreads << " number of threads" << std::endl;
 
-    //there will be a loop here to add all of the files to the chain. Now we're just doing one to test this whole thing works.
-    if (skimToUse < 0){
-      if (oneFileOnly) datasetChain->Add((dataset.getFolderName()+"OutTree_1.root").c_str());
-      else addFilesToChain(datasetChain,dataset.getFolderName(),startFile,dataset.getnFiles());
-    }
-    else {
-      delete datasetChain;
-      datasetChain = new TChain("BOOM");
-      if (oneFileOnly) datasetChain->Add((skimFolder+dataset.getName()+"/skimTree1.root").c_str());
-      else datasetChain->Add((skimFolder+dataset.getName()+"/skimTree*.root").c_str());
-    }
-      // datasetChain->Add("/publicfs/cms/data/TopQuark/cms13TeV/Samples2202/mc/ST_tW_top_5f_inclusiveDecays_13TeV-powheg-pythia8_TuneCUETP8M1/crab_Full2202_ST/160222_223524/0000/OutTree_1.root");
-
-    tWEvent * event = new tWEvent(datasetChain);
-    
-    
-    //If we're making a skim (which is, nominally, the point of this script, though it's probably just gonna become my eventual analysis script) then make the skimming file here.
-    TTree * cloneTree;
-    if (cutStage > -1){
-      cloneTree = datasetChain->CloneTree(0);
-      cutObj->setSkimTree(cutStage,cloneTree);
-    }
-
-    //This variable is used for saving the tree part way through production if the number of selected events exceeds a certain amount.
-    int nSkimFiles = (startFile - 1) / 50.;
-
-    //Begin loop over all events
-    int numberSelected = 0;
-
-    //This is now how this is going down. Firstly we work out how many files we're adding.
-    //    if (beginFileNumber > 0) 
-
-    do{
-      int numberOfEntries = datasetChain->GetEntries();
-      std::cout << "Tree to be processed contains " << numberOfEntries << " entries." << std::endl;
-
-      int maxFiles = dataset.getnFiles();
-      int upperFile = maxFiles;
-      if (skimToUse < 0 && startFile + 49 < maxFiles) upperFile = startFile+49;
-      std::cout << std::endl << "Processing files " << startFile << "-" << upperFile << std::endl;
-      for ( int evtInd = 0; evtInd < numberOfEntries; evtInd++){
-	if (evtInd % 5000 < 0.01) {
-	  if (cutStage > -1) std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " and number in clone tree: " << cloneTree->GetEntries() << " \r";
-	  else  std::cout << evtInd << " (" << 100*float(evtInd)/numberOfEntries << "%) Selected: " << numberSelected << " \r";
-	  std::cout.flush();
-	}
-	//Gonna see if the output tree being too big is the reason it's being terminated. The other option is that it's the input tree being too big, which would be much harder to solve.
-	// I originally put this after the sleection requirements which obviously does not turn out like I plan it to.
-	if (cutStage > -1){
-	  if (cloneTree->GetEntries() > 9999){
-	    std::cout << std::endl << "Tree contains " << cloneTree->GetEntries() << " events, so we're now saving a skim. This is skim #" << nSkimFiles << std::endl;
-	    TFile cloneFile(("skims/"+dataset.getName()+cutStageNameVec[cutStage]+std::to_string(nSkimFiles)+".root").c_str(),"RECREATE");
-	    cloneFile.cd();
-	    cloneTree->Write();
-	    cloneFile.Write();
-	    cloneFile.Close();
-	    nSkimFiles++;
-	    delete cloneTree;
-	    cloneTree = datasetChain->CloneTree(0);
-	    cutObj->setSkimTree(cloneTree);
-	  }
-	}
-	
-	
-	event->GetEntry(evtInd);
-	//Make the cuts!
-	if (!cutObj->makeCuts(event)) continue;
-	numberSelected++;
-	
-      } //Close loop over all events in that one tree.
-      if (skimToUse < 0){
-	//Load next tree
-	startFile+=50;
-	addFilesToChain(datasetChain,dataset.getFolderName(),startFile,dataset.getnFiles());
-	delete event;
-	event = new tWEvent(datasetChain);
-      }
-    }while(startFile < dataset.getnFiles() && skimToUse < 0);
-
-    std::cout << std::endl; //Add in a line break after the status bar thing.
-
-    //Save the clone trees here
-    if (cutStage > -1){
-      TFile cloneFile(("skims/"+dataset.getName()+cutStageNameVec[cutStage]+std::to_string(nSkimFiles)+".root").c_str(),"RECREATE");
-      cloneFile.cd();
-      cloneTree->Write();
-      cloneFile.Write();
-      cloneFile.Close();
-    }
-
-    if (makeCutFlow){
-      std::cout << "Cut flow for " << dataset.getName() << std::endl;
-      for (int cfInd = 1; cfInd < cutFlow[dataset.getName()]->GetXaxis()->GetNbins()+1; cfInd++){
-	std::cout << cutFlowStringList[cfInd-1] << " : " << cutFlow[dataset.getName()]->GetBinContent(cfInd) << std::endl;
-	TFile * cutFlowFile = new TFile((plotOutDir + dataset.getName() + "+cutFlow"+std::to_string(startFile) + ".root").c_str(),"RECREATE");
-	cutFlowFile->cd();
-	cutFlow[dataset.getName()]->Write();
-	cutFlowFile->Write();
-	cutFlowFile->Close();
-	delete cutFlowFile;
-      }
+    //Now launch them! Isn't this exciting.
+    for (int threadInd = 0; threadInd < nThreads; threadInd++) {
       
+      
+
+      threadArg * args = new threadArg {threadInd, dataset};
+      //      args[threadInd].threadId = threadInd;
+      //args[threadInd].dataset = dataset;
+
+
+      //      t[threadInd] = new TThread(std::to_string(threadInd).c_str(),threadedSelection,(void*)&tempArgs);
+      t[threadInd] = std::thread(threadedSelection,(void*)args);
+      //      t[threadInd].join();
+      //t[threadInd]->Run();
+
     }
-    //output the generated historgrams into a single root file per dataset for later combination.
-    if (plotConf){
-      TFile * tempFile = new TFile((plotOutDir + dataset.getName() + "_plots" + std::to_string(startFile) + ".root").c_str(),"RECREATE");
-      for (auto const & stageName : cutStageNameVec){
-	plotMap[dataset.getName()][stageName]->saveHists(tempFile);
-      }
-      tempFile->Write();
-      tempFile->Close();
-      delete tempFile;
+
+    for (int threadInd = 0; threadInd < nThreads; threadInd++) {
+      //      t[threadInd]->Join();
+      t[threadInd].join();
     }
+    
+    //    for (int threadInd = 0; threadInd < nThreads; threadInd++) {
+    //  t[threadInd]->Delete();
+    // }
+
+    //    for (int threadInd = 0; threadInd < nThreads; threadInd++) {
+    // delete t[threadInd];
+    //
+
+    std::cout << std::endl;
 
   } // Close dataset loop
-
+  
+  //This doesn't make sense anymore. Don't want to delete it though ,coz it might be useful.
+  /*
   //Make the plots if we're doing that
   HistogramPlotter plotObj = HistogramPlotter(legOrder,plotOrder,datasetInfos);
   plotObj.setLabelOne("CMS Preliminary");
@@ -384,5 +424,5 @@ int main(int argc, char* argv[]){
 	delete plots.second;
       }
     }
-  }
+  }*/
 } // end main

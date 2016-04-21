@@ -327,8 +327,32 @@ std::vector<int> Cuts::getBJets(tWEvent* event){
   return bJetInds;
 }
 
-//Placeholder for now. No cuts applied.
+//I don't really know what this might be apart from a simple pt cut, but it's here anyway.
 bool Cuts::makeMETCuts(tWEvent* event){
   if (event->Met_type1PF_pt < metCut_) return false;
   return true;
+}
+
+//Set the channel. Moved this from the skimMain for the purpose of cleaning up that code.
+void Cuts::setCutChannel(int  channel){
+  
+  switch (channel){
+  case 0:
+    setNTightMuon(2);
+    setNTightEles(0);
+    setNJets(1);
+    setNBJets(1);    
+    isLepJets(false);
+    break;
+  case 1:
+    setNTightMuon(1);
+    setNTightEles(0);
+    setNJets(3);     
+    setNBJets(1);    
+    isLepJets(true); 
+    break;
+  default:
+    std::cout << "Come on, pick a real channel!" <<std::endl;
+  }
+
 }
