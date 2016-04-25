@@ -724,6 +724,9 @@ public :
    float lepton1RelIso;
    TLorentzVector lepton2;
    float lepton2RelIso;
+   TLorentzVector bJetVec;
+   TLorentzVector otherJetVec1;
+   TLorentzVector otherJetVec2;
    
    // List of branches
    TBranch        *b_Gen_pt;   //!

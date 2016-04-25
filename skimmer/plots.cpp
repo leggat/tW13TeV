@@ -85,23 +85,35 @@ void Plots::fillAllPlots(tWEvent* event, float weight, int cutStage){
     if (plotsVec[i].name == "jet1Tag" && cutStage > 0 && event->jetIndex.size() > 0){
       plotsVec[i].hist->Fill(event->Jet_pfCombinedInclusiveSecondaryVertexV2BJetTags->at(event->jetIndex[0]),weight);
     }
-    if (plotsVec[i].name == "jet2Pt" && cutStage > 0 && event->jetIndex.size() > 0){
+    if (plotsVec[i].name == "jet2Pt" && cutStage > 0 && event->jetIndex.size() > 1){
       plotsVec[i].hist->Fill(event->Jet_pt->at(event->jetIndex[1]),weight);
     }
-    if (plotsVec[i].name == "jet2Eta" && cutStage > 0 && event->jetIndex.size() > 0){
+    if (plotsVec[i].name == "jet2Eta" && cutStage > 0 && event->jetIndex.size() > 1){
       plotsVec[i].hist->Fill(event->Jet_eta->at(event->jetIndex[1]),weight);
     }
-    if (plotsVec[i].name == "jet2Tag" && cutStage > 0 && event->jetIndex.size() > 0){
+    if (plotsVec[i].name == "jet2Tag" && cutStage > 0 && event->jetIndex.size() > 1){
       plotsVec[i].hist->Fill(event->Jet_pfCombinedInclusiveSecondaryVertexV2BJetTags->at(event->jetIndex[1]),weight);
     }
-    if (plotsVec[i].name == "jet3Pt" && cutStage > 0 && event->jetIndex.size() > 0){
+    if (plotsVec[i].name == "jet3Pt" && cutStage > 0 && event->jetIndex.size() > 2){
       plotsVec[i].hist->Fill(event->Jet_pt->at(event->jetIndex[2]),weight);
     }
-    if (plotsVec[i].name == "jet3Eta" && cutStage > 0 && event->jetIndex.size() > 0){
+    if (plotsVec[i].name == "jet3Eta" && cutStage > 0 && event->jetIndex.size() > 2){
       plotsVec[i].hist->Fill(event->Jet_eta->at(event->jetIndex[2]),weight);
     }
-    if (plotsVec[i].name == "jet3Tag" && cutStage > 0 && event->jetIndex.size() > 0){
+    if (plotsVec[i].name == "jet3Tag" && cutStage > 0 && event->jetIndex.size() > 2){
       plotsVec[i].hist->Fill(event->Jet_pfCombinedInclusiveSecondaryVertexV2BJetTags->at(event->jetIndex[2]),weight);
+    }
+    if (plotsVec[i].name == "combJetMass" && cutStage > 2){
+      plotsVec[i].hist->Fill((event->otherJetVec1 + event->otherJetVec2).M(),weight);
+    }
+    if (plotsVec[i].name == "mTW"){
+      plotsVec[i].hist->Fill(std::sqrt(2*event->Met_type1PF_pt*event->lepton1.Pt()*(1-cos(event->Met_type1PF_phi - event->lepton1.Phi()))),weight);
+    }
+    if (plotsVec[i].name == "threeJetMass" && cutStage > 2){
+      plotsVec[i].hist->Fill((event->bJetVec + event->otherJetVec1 + event->otherJetVec2).M());
+    }
+    if (plotsVec[i].name == "mTt" && cutStage > 2){
+      plotsVec[i].hist->Fill(std::sqrt(2*event->Met_type1PF_pt*(event->lepton1+event->bJetVec).Pt()*(1-cos(event->Met_type1PF_phi - (event->lepton1 + event->bJetVec).Phi()))),weight);
     }
     if (plotsVec[i].name == "nBJets" && cutStage > 1){
       plotsVec[i].hist->Fill(event->bTagIndex.size(),weight);

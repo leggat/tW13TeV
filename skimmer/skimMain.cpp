@@ -134,7 +134,6 @@ void threadedSelection(void * ptr){
     cutObj->setPlots(datasetPlots);
   }
 
-
   //If we're doing skimming, make the clone tree here
   TTree * cloneTree;
   if (cutStage > -1){
@@ -362,33 +361,49 @@ int main(int argc, char* argv[]){
     //calculated how many threads we're going to run.
     int nThreads = std::ceil(dataset.getnFiles() / 100.);
 
+    int nThreadIncr = 7;
+
     //    TThread* t[nThreads];
     std::thread t[nThreads];
 
     std::cout << nThreads << " number of threads" << std::endl;
 
-    //Now launch them! Isn't this exciting.
-    for (int threadInd = 0; threadInd < nThreads; threadInd++) {
-      
-      
-
-      threadArg * args = new threadArg {threadInd, dataset};
-      //      args[threadInd].threadId = threadInd;
-      //args[threadInd].dataset = dataset;
-
-
-      //      t[threadInd] = new TThread(std::to_string(threadInd).c_str(),threadedSelection,(void*)&tempArgs);
-      t[threadInd] = std::thread(threadedSelection,(void*)args);
-      //      t[threadInd].join();
-      //t[threadInd]->Run();
-
-    }
-
-    for (int threadInd = 0; threadInd < nThreads; threadInd++) {
-      //      t[threadInd]->Join();
-      t[threadInd].join();
-    }
+    //For some reason now it seg faults for more than 10 threads, so we'll limit the number of active threads to 10.
+    int beginThread = 0;
+    int endThread = nThreads;
+    if (nThreads > nThreadIncr) endThread = nThreadIncr;
     
+    bool notFinished = true;
+
+    do {
+      if (endThread == nThreads) notFinished = false;
+      //Now launch them! Isn't this exciting.
+      for (int threadInd = beginThread; threadInd < endThread; threadInd++) {
+      
+      
+
+	threadArg * args = new threadArg {threadInd, dataset};
+	//      args[threadInd].threadId = threadInd;
+	//args[threadInd].dataset = dataset;
+
+
+	//      t[threadInd] = new TThread(std::to_string(threadInd).c_str(),threadedSelection,(void*)&tempArgs);
+	t[threadInd] = std::thread(threadedSelection,(void*)args);
+	//      t[threadInd].join();
+	//t[threadInd]->Run();
+
+      }
+
+      for (int threadInd = beginThread; threadInd < endThread; threadInd++) {
+	//      t[threadInd]->Join();
+	t[threadInd].join();
+      }
+      beginThread += nThreadIncr;
+      endThread += nThreadIncr;
+      if (endThread > nThreads) endThread = nThreads;
+    } while (notFinished);
+
+
     //    for (int threadInd = 0; threadInd < nThreads; threadInd++) {
     //  t[threadInd]->Delete();
     // }

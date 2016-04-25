@@ -146,8 +146,19 @@ bool Cuts::makePVCuts(tWEvent * event){
 bool Cuts::makeTriggerSelection(tWEvent * event){
   //  std::cout << event->HLT_IsoMu18 << std::endl;
   //  if (!event->HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ) return false;
-  if (!event->HLT_IsoMu18 && !event->HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ) return false;
-  //  if (event->H
+  switch (nMuonsTight_){
+  case 1:
+    if (!event->HLT_IsoMu18) return false;
+    break;
+  case 2:
+    if (!event->HLT_IsoMu18 && !event->HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ) return false;
+    break;
+  default:
+    std::cout << "not an acceptable number of muons!" << std::endl;
+    return false;
+    break;
+  }
+
   return true;
 }
 //end trigger cuts
@@ -190,6 +201,7 @@ bool Cuts::makeLeptonCuts(tWEvent * event){
     //Low dilepton mass cut.
     if ((event->lepton1 + event->lepton2).M() < lowMassCut_) return false;
   }
+
 
   //Do single lepton specific cuts here
   if (nMuonsTight_ + nEleTight_ == 1){
@@ -289,6 +301,7 @@ bool Cuts::makeJetCuts(tWEvent* event){
   event->jetIndex = getJets(event);
   if (fillPlots_) plotObj_["jetSel"]->fillAllPlots(event,datasetWeight_*eventWeight_,1);
   if (event->jetIndex.size() != nJets_) return false;
+
   return true;
 }
 
@@ -314,6 +327,23 @@ bool Cuts::makeBCuts(tWEvent* event){
   event->bTagIndex = getBJets(event);
   if (fillPlots_) plotObj_["bTag"]->fillAllPlots(event,datasetWeight_*eventWeight_,2);
   if (event->bTagIndex.size() != nBJets_) return false;
+
+  //Now if we're doing lep + jets put the other two jets into the other jet vectors
+  event->bJetVec.SetPtEtaPhiE(event->Jet_pt->at(event->bTagIndex[0]),event->Jet_eta->at(event->bTagIndex[0]),event->Jet_phi->at(event->bTagIndex[0]),event->Jet_energy->at(event->bTagIndex[0]));
+  if (nJets_ == 3){
+    for (auto const jetInd : event->jetIndex){
+      int num = 1;
+      if (jetInd == event->bTagIndex[0]) continue;
+      if (num == 1){
+	event->otherJetVec1.SetPtEtaPhiE(event->Jet_pt->at(jetInd),event->Jet_eta->at(jetInd),event->Jet_phi->at(jetInd),event->Jet_energy->at(jetInd));
+	num++;
+      }
+      else {
+	event->otherJetVec2.SetPtEtaPhiE(event->Jet_pt->at(jetInd),event->Jet_eta->at(jetInd),event->Jet_phi->at(jetInd),event->Jet_energy->at(jetInd));
+      }
+    }
+  }
+
   return true;
 }
 
