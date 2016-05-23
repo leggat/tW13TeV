@@ -58,10 +58,14 @@ int channel = 0;
 
 int cutStage = -1;
 
+int nFilesPerThread = 100;
+
+int nThreadIncr = 5;
+
 bool addFilesToChain(TChain * chain, std::string folderName, std::string fileName, int startFile, int nFiles){
   chain->Reset();
   int j = 0;
-  for (int i = startFile; i <= startFile+99; i++){
+  for (int i = startFile; i < startFile+nFilesPerThread; i++){
     if (i > nFiles) break;
     //By checking the stat of the file we make sure that we don't include files that don't actually exist.
     struct stat buffer;
@@ -105,7 +109,7 @@ void threadedSelection(void * ptr){
 
   cutObj->setCutChannel(channel);
 
-  int startFile = threadID * 100 + 1;
+  int startFile = threadID * nFilesPerThread + 1;
 
   mu.lock();
   if (skimToUse < 0){
@@ -246,6 +250,8 @@ void show_usage(std::string name){
 	    << "\t-b\tBEGINFILE\tThe file to begin running on. Useful for parallelising processing.\n"
 	    << "\t-e\tENDFILE\tThe file to end on. Defaults to nFiles if larger than the number of files.\n"
 	    << "\t-y\t\tSkips a thread if the plot file has already been created. This is, again, to deal with the random termination problems I've been encountering.\n"
+	    << "\t-t\tNTHREADS\tNumber of theads to run concurrently.\n"
+	    << "\t-b\tNFILESPERTHREAD\tNumber of files to put in each thread.\n"
 	    << std::endl;
 }
 
@@ -259,7 +265,7 @@ int main(int argc, char* argv[]){
   //The integrated luminosity of the data being used. 
   //At some point this should become a sum of lumis of the data being used, but for now it is hard-coded because I'm not looking at data yet. Or something.
 
-  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ac:y"))!=-1){
+  while ((opt = getopt(argc,argv,"hsd:m:fp:o:u:ac:yt:b:"))!=-1){
     switch (opt) {
     case 'h':
       show_usage(argv[0]);
@@ -288,6 +294,12 @@ int main(int argc, char* argv[]){
       break;
     case 'a':
       skipPreviousSkims = true;
+      break;
+    case 'b':
+      nFilesPerThread = atoi(optarg);
+      break;
+    case 't':
+      nThreadIncr = atoi(optarg);
       break;
     case 'c':
       channel = atoi(optarg);
@@ -359,9 +371,7 @@ int main(int argc, char* argv[]){
     //Do some initialisations of stuff on a per-dataset basis here.
     
     //calculated how many threads we're going to run.
-    int nThreads = std::ceil(dataset.getnFiles() / 100.);
-
-    int nThreadIncr = 7;
+    int nThreads = std::ceil(dataset.getnFiles() / (float)nFilesPerThread);
 
     //    TThread* t[nThreads];
     std::thread t[nThreads];

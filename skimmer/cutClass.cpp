@@ -310,6 +310,9 @@ std::vector<int> Cuts::getJets(tWEvent* event){
   std::vector<int> jetInd;
 
   for (unsigned int i = 0; i < event->Jet_pt->size(); i++){
+    //Make a vector of the jet. This may come in useful if I need to smear jets or something.
+    TLorentzVector tempJetVec;
+    tempJetVec.SetPtEtaPhiE(event->Jet_pt->at(i),event->Jet_eta->at(i),event->Jet_phi->at(i),event->Jet_energy->at(i));
     if (event->Jet_pt->at(i) < jetPtCut_) continue;
     if (fabs(event->Jet_eta->at(i)) > jetEtaCut_) continue;
     //Do jet ID.
@@ -317,6 +320,14 @@ std::vector<int> Cuts::getJets(tWEvent* event){
     if (!((fabs(event->Jet_eta->at(i)) < 2.4) && (event->Jet_chargedHadronEnergyFraction->at(i) > 0. && event->Jet_chargedMultiplicity->at(i) > 0. && event->Jet_chargedEmEnergyFraction->at(i) < 0.99))) continue;
     if ((fabs(event->Jet_eta->at(i)) > 3.) && !(event->Jet_neutralEmEnergyFraction->at(i) < 0.9 && (event->Jet_numberOfConstituents->at(i) - event->Jet_chargedMultiplicity->at(i)) > 10)) continue;
     jetInd.push_back(i);
+    //It looks like jet cleaning isn't done, so let's do that here.
+    if (nMuonsTight_ + nEleTight_ > 0){
+      if (tempJetVec.DeltaR(event->lepton1) < 0.3) continue;
+    }
+    if (nMuonsTight_ + nEleTight_ > 1){
+      if (tempJetVec.DeltaR(event->lepton2) < 0.3) continue;
+    }
+  
   }
 
   return jetInd;

@@ -110,11 +110,23 @@ void Plots::fillAllPlots(tWEvent* event, float weight, int cutStage){
       plotsVec[i].hist->Fill(std::sqrt(2*event->Met_type1PF_pt*event->lepton1.Pt()*(1-cos(event->Met_type1PF_phi - event->lepton1.Phi()))),weight);
     }
     if (plotsVec[i].name == "threeJetMass" && cutStage > 2){
-      plotsVec[i].hist->Fill((event->bJetVec + event->otherJetVec1 + event->otherJetVec2).M());
+      plotsVec[i].hist->Fill((event->bJetVec + event->otherJetVec1 + event->otherJetVec2).M(),weight);
     }
     if (plotsVec[i].name == "mTt" && cutStage > 2){
       plotsVec[i].hist->Fill(std::sqrt(2*event->Met_type1PF_pt*(event->lepton1+event->bJetVec).Pt()*(1-cos(event->Met_type1PF_phi - (event->lepton1 + event->bJetVec).Phi()))),weight);
     }
+    if (plotsVec[i].name == "jetDeltaR" && cutStage > 2){
+      plotsVec[i].hist->Fill(event->otherJetVec1.DeltaR(event->otherJetVec2),weight);
+    }
+    if (plotsVec[i].name == "bjetsDeltaR" && cutStage > 2){
+      plotsVec[i].hist->Fill(event->bJetVec.DeltaR(event->otherJetVec2 + event->otherJetVec1),weight);
+    }
+    if (plotsVec[i].name == "lepjetsDeltaR" && cutStage > 2){
+      plotsVec[i].hist->Fill(event->lepton1.DeltaR(event->otherJetVec2 + event->otherJetVec1),weight);
+    }    
+    if (plotsVec[i].name == "lepbjetDeltaR" && cutStage > 2){
+      plotsVec[i].hist->Fill(event->lepton1.DeltaR(event->bJetVec),weight);
+    }    
     if (plotsVec[i].name == "nBJets" && cutStage > 1){
       plotsVec[i].hist->Fill(event->bTagIndex.size(),weight);
     }
@@ -135,6 +147,13 @@ void Plots::fillAllPlots(tWEvent* event, float weight, int cutStage){
     }
     if (plotsVec[i].name == "dileptonMass"){
       plotsVec[i].hist->Fill((event->lepton1+event->lepton2).M(),weight);
+    }
+    if (plotsVec[i].name == "ptSysLepJet" && cutStage > 2){
+      int px = 0.;
+      int py = 0.;
+      px = event->lepton1.Px() + event->bJetVec.Px() + event->otherJetVec1.Px() + event->otherJetVec2.Px() + event->Met_type1PF_px;
+      py = event->lepton1.Py() + event->bJetVec.Py() + event->otherJetVec1.Py() + event->otherJetVec2.Py() + event->Met_type1PF_py;
+      plotsVec[i].hist->Fill(sqrt(px * px + py * py),weight);
     }
   }
 }
