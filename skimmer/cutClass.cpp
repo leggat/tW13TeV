@@ -319,7 +319,6 @@ std::vector<int> Cuts::getJets(tWEvent* event){
     if (!((fabs(event->Jet_eta->at(i)) < 3.) && (event->Jet_neutralHadEnergyFraction->at(i) < 0.99 && event->Jet_neutralEmEnergyFraction->at(i) < 0.99 && event->Jet_numberOfConstituents->at(i) > 1))) continue;
     if (!((fabs(event->Jet_eta->at(i)) < 2.4) && (event->Jet_chargedHadronEnergyFraction->at(i) > 0. && event->Jet_chargedMultiplicity->at(i) > 0. && event->Jet_chargedEmEnergyFraction->at(i) < 0.99))) continue;
     if ((fabs(event->Jet_eta->at(i)) > 3.) && !(event->Jet_neutralEmEnergyFraction->at(i) < 0.9 && (event->Jet_numberOfConstituents->at(i) - event->Jet_chargedMultiplicity->at(i)) > 10)) continue;
-    jetInd.push_back(i);
     //It looks like jet cleaning isn't done, so let's do that here.
     if (nMuonsTight_ + nEleTight_ > 0){
       if (tempJetVec.DeltaR(event->lepton1) < 0.3) continue;
@@ -327,6 +326,7 @@ std::vector<int> Cuts::getJets(tWEvent* event){
     if (nMuonsTight_ + nEleTight_ > 1){
       if (tempJetVec.DeltaR(event->lepton2) < 0.3) continue;
     }
+    jetInd.push_back(i);
   
   }
 
